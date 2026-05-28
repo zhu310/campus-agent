@@ -88,6 +88,57 @@ export interface WorkflowResponse {
   risk_reminders: string[]
 }
 
+export interface NoticeEvidence {
+  document_id: number
+  filename: string
+  text: string
+  location?: string | null
+}
+
+export interface NoticeTaskCard {
+  title: string
+  deadline?: string | null
+  submit_method?: string | null
+  required_materials: string[]
+  steps: string[]
+  risk_reminders: string[]
+  evidence: NoticeEvidence[]
+  status: string
+}
+
+export interface NoticeTaskResponse {
+  summary: string
+  tasks: NoticeTaskCard[]
+  missing_information: string[]
+  cross_document_risks: string[]
+  fallback_used: boolean
+}
+
+export interface DraftSection {
+  field_name: string
+  draft: string
+  basis: string
+  needs_user_input: boolean
+}
+
+export interface FillAssistantResponse {
+  required_information: string[]
+  questions: string[]
+  draft_sections: DraftSection[]
+  risks: string[]
+  evidence: NoticeEvidence[]
+  fallback_used: boolean
+}
+
+export interface FillReviewResponse {
+  passed: boolean
+  conclusion: string
+  issues: string[]
+  suggestions: string[]
+  evidence: NoticeEvidence[]
+  fallback_used: boolean
+}
+
 export interface DashboardMetric {
   label: string
   value: string
@@ -167,4 +218,75 @@ export interface TaskDetail {
   summary: string
   payload: Record<string, unknown>
   created_at: string
+}
+
+export interface SessionEventItem {
+  id: number
+  event_type: string
+  title: string
+  payload: Record<string, unknown>
+  created_at: string
+}
+
+export interface SessionItem {
+  id: number
+  name: string
+  scenario: string
+  summary: string
+  document_ids: number[]
+  created_at: string
+  updated_at: string
+}
+
+export interface SessionDetail extends SessionItem {
+  events: SessionEventItem[]
+}
+
+export interface MemoryItem {
+  id: number
+  key: string
+  value: string
+  category: string
+  source: string
+  confirmed: boolean
+  created_at: string
+  updated_at: string
+}
+
+export interface DataAnalysisColumn {
+  name: string
+  type: string
+  non_null: number
+  missing: number
+  unique: number
+}
+
+export interface NumericSummary {
+  column: string
+  min: number | null
+  max: number | null
+  mean: number | null
+  sum: number | null
+}
+
+export interface DataAnalysisBlock {
+  key: string
+  file_name: string
+  sheet: string
+  row_count: number
+  column_count: number
+  missing_cells: number
+  missing_rate: number
+  columns: DataAnalysisColumn[]
+  numeric_summary: NumericSummary[]
+  preview: Record<string, unknown>[]
+}
+
+export interface DataAnalysisResponse {
+  task: string
+  files: { file_name: string; blocks: number }[]
+  block_count: number
+  blocks: DataAnalysisBlock[]
+  insights: string
+  fallback_used: boolean
 }

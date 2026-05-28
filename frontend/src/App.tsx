@@ -1,7 +1,8 @@
 // 应用顶层导航和页面切换入口。
 import { Layout, Menu } from 'antd'
-import { AppstoreOutlined, HistoryOutlined, NodeIndexOutlined, ProductOutlined } from '@ant-design/icons'
+import { AppstoreOutlined, BarChartOutlined, HistoryOutlined, ProductOutlined, SettingOutlined } from '@ant-design/icons'
 import { useState } from 'react'
+import DataAnalysisPage from './pages/DataAnalysisPage'
 import DashboardPage from './pages/DashboardPage'
 import ExtensionsPage from './pages/ExtensionsPage'
 import RecordsPage from './pages/RecordsPage'
@@ -29,16 +30,28 @@ export default function App() {
           items={[
             { key: 'dashboard', icon: <ProductOutlined />, label: 'Dashboard' },
             { key: 'workspace', icon: <AppstoreOutlined />, label: '智能办理' },
-            { key: 'records', icon: <HistoryOutlined />, label: '记录留痕' },
-            { key: 'extensions', icon: <NodeIndexOutlined />, label: '拓展中心' },
+            { key: 'analytics', icon: <BarChartOutlined />, label: '数据分析' },
+            { key: 'records', icon: <HistoryOutlined />, label: '任务历史' },
+            { key: 'extensions', icon: <SettingOutlined />, label: '系统设置' },
           ]}
         />
       </Header>
       <Content className={`app-content app-content-compact ${active === 'workspace' ? 'workspace-content' : 'page-content'}`}>
-        {active === 'dashboard' ? <DashboardPage onStart={openWorkspace} /> : null}
-        {active === 'workspace' ? <WorkspacePage initialScenario={workspaceScenario} /> : null}
-        {active === 'records' ? <RecordsPage /> : null}
-        {active === 'extensions' ? <ExtensionsPage /> : null}
+        <div style={{ display: active === 'dashboard' ? 'block' : 'none', height: '100%' }}>
+          <DashboardPage onStart={openWorkspace} />
+        </div>
+        <div style={{ display: active === 'workspace' ? 'block' : 'none', height: '100%' }}>
+          <WorkspacePage initialScenario={workspaceScenario} />
+        </div>
+        <div style={{ display: active === 'records' ? 'block' : 'none', height: '100%' }}>
+          <RecordsPage />
+        </div>
+        <div style={{ display: active === 'analytics' ? 'block' : 'none', height: '100%' }}>
+          <DataAnalysisPage />
+        </div>
+        <div style={{ display: active === 'extensions' ? 'block' : 'none', height: '100%' }}>
+          <ExtensionsPage />
+        </div>
       </Content>
     </Layout>
   )

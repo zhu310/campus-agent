@@ -1,9 +1,10 @@
 // 独立问答页面：用于围绕已选知识文档进行 RAG 咨询。
-import { Button, Card, Col, Input, Row, Space, Typography, Upload, message, Tag, Divider, List, Descriptions } from 'antd'
+import { useEffect, useState } from 'react'
+import { Button, Card, Checkbox, Col, Input, Row, Space, Typography, Upload, message, Tag, Divider, List, Descriptions } from 'antd'
 import { InboxOutlined } from '@ant-design/icons'
-import { useState } from 'react'
+import type { UploadRequestOption } from 'rc-upload/lib/interface'
 import api from '../api'
-import { AskResponse, AuditResponse, FormFillResponse } from '../types'
+import { AskResponse, AuditResponse, DocumentItem, FormFillResponse } from '../types'
 
 const { TextArea } = Input
 const { Title, Paragraph, Text } = Typography
@@ -14,26 +15,56 @@ export default function ChatPage() {
   const [materialText, setMaterialText] = useState('姓名：张三\n手机号：13800138000\n邮箱：demo@example.com\nQQ：12345678\n项目名称：校智办——高校事务智能办理Agent\n指导教师：李老师')
   const [auditResult, setAuditResult] = useState<AuditResponse | null>(null)
   const [formResult, setFormResult] = useState<FormFillResponse | null>(null)
+  const [documents, setDocuments] = useState<DocumentItem[]>([])
+  const [selectedDocumentIds, setSelectedDocumentIds] = useState<number[]>([])
+  const [displayName, setDisplayName] = useState('')
   const [loadingAsk, setLoadingAsk] = useState(false)
   const [loadingAudit, setLoadingAudit] = useState(false)
   const [loadingForm, setLoadingForm] = useState(false)
 
-  const uploadProps = {
-    name: 'file',
-    action: 'http://localhost:8000/api/documents/upload',
-    onChange(info: any) {
-      if (info.file.status === 'done') {
-        message.success(`上传成功：${info.file.name}`)
-      } else if (info.file.status === 'error') {
-        message.error(`上传失败：${info.file.name}`)
-      }
-    },
+  const knowledgeDocs = documents.filter((item) => item.source_type === 'knowledge_base' || item.source_type === 'both')
+
+  const loadDocuments = async () => {
+    const { data } = await api.get<DocumentItem[]>('/documents')
+    setDocuments(data)
+  }
+
+  useEffect(() => {
+    loadDocuments().catch(() => undefined)
+  }, [])
+
+  const uploadKnowledgeFile = async (options: UploadRequestOption) => {
+    const file = options.file as File
+    const form = new FormData()
+    form.append('file', file)
+    form.append('source_type', 'knowledge_base')
+    if (displayName.trim()) {
+      form.append('display_name', displayName.trim())
+    }
+    try {
+      const { data } = await api.post('/documents/upload', form)
+      setSelectedDocumentIds((ids) => Array.from(new Set([...ids, data.document_id])))
+      setDisplayName('')
+      await loadDocuments()
+      message.success(`上传成功：${displayName.trim() || file.name}`)
+      options.onSuccess?.({}, new XMLHttpRequest())
+    } catch (error: any) {
+      message.error(error?.response?.data?.detail || `上传失败：${file.name}`)
+      options.onError?.(error)
+    }
   }
 
   const handleAsk = async () => {
+    if (!selectedDocumentIds.length) {
+      message.warning('请先勾选用于问答的制度、通知或历史文件')
+      return
+    }
     try {
       setLoadingAsk(true)
-      const { data } = await api.post<AskResponse>('/chat/ask', { question })
+      const { data } = await api.post<AskResponse>('/chat/ask', {
+        question,
+        document_ids: selectedDocumentIds,
+      })
       setAnswer(data)
     } finally {
       setLoadingAsk(false)
@@ -67,12 +98,37 @@ export default function ChatPage() {
   return (
     <Row gutter={16}>
       <Col span={6}>
-        <Card title="资料上传" bordered={false}>
-          <Upload.Dragger {...uploadProps} accept=".pdf,.txt,.md">
+        <Card title="资料上传与选择" bordered={false}>
+          <Input
+            value={displayName}
+            onChange={(event) => setDisplayName(event.target.value)}
+            placeholder="文件显示名称，如：比赛报名通知"
+            style={{ marginBottom: 10 }}
+          />
+          <Upload.Dragger customRequest={uploadKnowledgeFile} showUploadList={false} accept=".pdf,.docx,.txt,.md">
             <p className="ant-upload-drag-icon"><InboxOutlined /></p>
             <p className="ant-upload-text">上传通知、制度、比赛说明 PDF</p>
-            <p className="ant-upload-hint">支持 pdf / txt / md</p>
+            <p className="ant-upload-hint">支持 pdf / docx / txt / md，上传后会自动加入下方选择</p>
           </Upload.Dragger>
+          <Divider />
+          <Title level={5}>选择问答来源</Title>
+          <Checkbox.Group value={selectedDocumentIds} onChange={(values) => setSelectedDocumentIds(values as number[])} style={{ width: '100%' }}>
+            <List
+              size="small"
+              dataSource={knowledgeDocs}
+              locale={{ emptyText: '暂无可用于问答的文件' }}
+              renderItem={(item) => (
+                <List.Item>
+                  <Checkbox value={item.id}>
+                    <Space direction="vertical" size={0}>
+                      <Text>{item.filename}</Text>
+                      <Text type="secondary">{item.source_type} / {item.scenario}</Text>
+                    </Space>
+                  </Checkbox>
+                </List.Item>
+              )}
+            />
+          </Checkbox.Group>
           <Divider />
           <Title level={5}>推荐提问</Title>
           <Space direction="vertical">

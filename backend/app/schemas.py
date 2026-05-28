@@ -40,6 +40,7 @@ class AskRequest(BaseModel):
     question: str = Field(..., min_length=1)
     scenario: str = "competition_registration"
     document_ids: List[int] = Field(default_factory=list)
+    session_id: Optional[int] = None
 
 
 class Citation(BaseModel):
@@ -88,12 +89,16 @@ class AuditRequest(BaseModel):
     task_type: str = "competition_registration"
     scenario: str = "competition_registration"
     ocr_fields: Dict[str, Any] = Field(default_factory=dict)
+    document_ids: List[int] = Field(default_factory=list)
+    session_id: Optional[int] = None
 
 
 class ExtractFieldsRequest(BaseModel):
     text: str
     scenario: str = "competition_registration"
     ocr_fields: Dict[str, Any] = Field(default_factory=dict)
+    document_ids: List[int] = Field(default_factory=list)
+    session_id: Optional[int] = None
 
 
 class ExtractFieldsResponse(BaseModel):
@@ -143,6 +148,8 @@ class FormFillRequest(BaseModel):
     text: str
     extracted_fields: Dict[str, Any] = Field(default_factory=dict)
     scenario: str = "competition_registration"
+    document_ids: List[int] = Field(default_factory=list)
+    session_id: Optional[int] = None
 
 
 class FormFillResponse(BaseModel):
@@ -191,6 +198,7 @@ class WorkflowRequest(BaseModel):
     request_text: str
     scenario: str = "competition_registration"
     document_ids: List[int] = Field(default_factory=list)
+    session_id: Optional[int] = None
 
 
 class WorkflowStep(BaseModel):
@@ -206,6 +214,85 @@ class WorkflowResponse(BaseModel):
     steps: List[WorkflowStep]
     required_materials: List[str]
     risk_reminders: List[str]
+
+
+class NoticeTaskRequest(BaseModel):
+    document_ids: List[int] = Field(default_factory=list)
+    user_goal: str = "帮我整理这些通知需要做什么"
+    scenario: str = "general"
+    session_id: Optional[int] = None
+
+
+class NoticeEvidence(BaseModel):
+    document_id: int
+    filename: str
+    text: str
+    location: Optional[str] = None
+
+
+class NoticeTaskCard(BaseModel):
+    title: str
+    deadline: Optional[str] = None
+    submit_method: Optional[str] = None
+    required_materials: List[str] = Field(default_factory=list)
+    steps: List[str] = Field(default_factory=list)
+    risk_reminders: List[str] = Field(default_factory=list)
+    evidence: List[NoticeEvidence] = Field(default_factory=list)
+    status: str = ""
+
+
+class NoticeTaskResponse(BaseModel):
+    summary: str
+    tasks: List[NoticeTaskCard]
+    missing_information: List[str] = Field(default_factory=list)
+    cross_document_risks: List[str] = Field(default_factory=list)
+    fallback_used: bool = False
+
+
+class FillAssistantRequest(BaseModel):
+    document_ids: List[int] = Field(default_factory=list)
+    user_profile: str = ""
+    form_text: str = ""
+    draft_content: str = ""
+    scenario: str = "general"
+    session_id: Optional[int] = None
+
+
+class DraftSection(BaseModel):
+    field_name: str
+    draft: str
+    basis: str = ""
+    needs_user_input: bool = False
+
+
+class FillAssistantResponse(BaseModel):
+    required_information: List[str] = Field(default_factory=list)
+    questions: List[str] = Field(default_factory=list)
+    draft_sections: List[DraftSection] = Field(default_factory=list)
+    risks: List[str] = Field(default_factory=list)
+    evidence: List[NoticeEvidence] = Field(default_factory=list)
+    fallback_used: bool = False
+
+
+class FillReviewRequest(BaseModel):
+    document_ids: List[int] = Field(default_factory=list)
+    user_profile: str = ""
+    draft_content: str = ""
+    scenario: str = "general"
+    session_id: Optional[int] = None
+
+
+class FillReviewResponse(BaseModel):
+    passed: bool
+    conclusion: str
+    issues: List[str] = Field(default_factory=list)
+    suggestions: List[str] = Field(default_factory=list)
+    evidence: List[NoticeEvidence] = Field(default_factory=list)
+    fallback_used: bool = False
+
+
+class ModelProviderRequest(BaseModel):
+    provider: str
 
 
 class DashboardMetric(BaseModel):
@@ -243,6 +330,62 @@ class TaskDetail(BaseModel):
     summary: str
     payload: Dict[str, Any]
     created_at: str
+
+
+class SessionCreateRequest(BaseModel):
+    name: str = "新的办理会话"
+    scenario: str = "general"
+    document_ids: List[int] = Field(default_factory=list)
+
+
+class SessionUpdateRequest(BaseModel):
+    name: str = Field(..., min_length=1, max_length=255)
+
+
+class SessionEventCreateRequest(BaseModel):
+    event_type: str
+    title: str
+    payload: Dict[str, Any] = Field(default_factory=dict)
+
+
+class SessionEventItem(BaseModel):
+    id: int
+    event_type: str
+    title: str
+    payload: Dict[str, Any]
+    created_at: str
+
+
+class SessionItem(BaseModel):
+    id: int
+    name: str
+    scenario: str
+    summary: str = ""
+    document_ids: List[int] = Field(default_factory=list)
+    created_at: str
+    updated_at: str
+
+
+class SessionDetail(SessionItem):
+    events: List[SessionEventItem] = Field(default_factory=list)
+
+
+class MemoryCreateRequest(BaseModel):
+    key: str = Field(..., min_length=1)
+    value: str = Field(..., min_length=1)
+    category: str = "profile"
+    source: str = "user_confirmed"
+
+
+class MemoryItem(BaseModel):
+    id: int
+    key: str
+    value: str
+    category: str
+    source: str
+    confirmed: bool
+    created_at: str
+    updated_at: str
 
 
 class SaveRecordRequest(BaseModel):

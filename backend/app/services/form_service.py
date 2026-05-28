@@ -16,7 +16,7 @@ FORM_TEMPLATE = {
     "负责人": "",
     "团队人数": "",
     "联系方式": "",
-    "项目类型": "Agent 智能体方向",
+    "项目类型": "",
     "项目名称": "",
     "团队成员": "",
     "学校": "",
@@ -194,17 +194,13 @@ def prefill_form(text: str, extracted_fields: Dict[str, Any] | None = None, scen
             "needs_review": True,
         }
 
-    material_type = fields.get("material_type")
-    if material_type == "科研英语演讲报名表":
-        required = {"项目名称", "团队成员", "团队人数", "学校", "学院/班级", "联系方式", "邮箱"}
-    else:
-        required = set() if _is_generic_scenario(scenario) else REQUIRED_FORM_FIELDS.get(scenario, REQUIRED_FORM_FIELDS["competition_registration"])
+    required = set() if _is_generic_scenario(scenario) else REQUIRED_FORM_FIELDS.get(scenario, REQUIRED_FORM_FIELDS["competition_registration"])
     missing_fields = [key for key, value in final_fields.items() if key in required and not value]
     review_fields = [key for key, source in prefill_sources.items() if source.get("needs_review")]
 
     return {
         "fields": final_fields,
-        "template_name": "通用开放字段表单" if _is_generic_scenario(scenario) else (material_type or f"{scenario} 办理表单"),
+        "template_name": "通用开放字段表单" if _is_generic_scenario(scenario) else f"{scenario} 办理表单",
         "missing_fields": missing_fields,
         "source_structure": structure,
         "prefill_tables": _prefill_tables_from_structure(structure, details["raw_fields"]),

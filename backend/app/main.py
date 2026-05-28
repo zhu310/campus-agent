@@ -11,6 +11,7 @@ from app.db.base import Base
 from app.db.session import engine
 from app.routes.audit import router as audit_router
 from app.routes.agent import router as agent_router
+from app.routes.analytics import router as analytics_router
 from app.routes.chat import router as chat_router
 from app.routes.dashboard import router as dashboard_router
 from app.routes.demo import router as demo_router
@@ -22,9 +23,11 @@ from app.routes.forms import router as forms_router
 from app.routes.health import router as health_router
 from app.routes.history import router as history_router
 from app.routes.knowledge import router as knowledge_router
+from app.routes.memory import router as memory_router
 from app.routes.ocr import router as ocr_router
 from app.routes.review import router as review_router
 from app.routes.rules import router as rules_router
+from app.routes.sessions import router as sessions_router
 from app.routes.tasks import router as tasks_router
 from app.routes.workflow import router as workflow_router
 import app.models  # noqa
@@ -45,9 +48,11 @@ app.add_middleware(
 app.include_router(health_router)
 app.include_router(documents_router, prefix="/api")
 app.include_router(knowledge_router, prefix="/api")
+app.include_router(memory_router, prefix="/api")
 app.include_router(chat_router, prefix="/api")
 app.include_router(audit_router, prefix="/api")
 app.include_router(agent_router, prefix="/api")
+app.include_router(analytics_router, prefix="/api")
 app.include_router(forms_router, prefix="/api")
 app.include_router(workflow_router, prefix="/api")
 app.include_router(dashboard_router, prefix="/api")
@@ -55,6 +60,7 @@ app.include_router(capabilities_router, prefix="/api")
 app.include_router(exports_router, prefix="/api")
 app.include_router(extensions_router, prefix="/api")
 app.include_router(history_router, prefix="/api")
+app.include_router(sessions_router, prefix="/api")
 app.include_router(tasks_router, prefix="/api")
 app.include_router(demo_router, prefix="/api")
 app.include_router(ocr_router, prefix="/api")
@@ -70,3 +76,8 @@ def root():
         "demo_mode": settings.DEMO_MODE,
         "features": ["RAG", "OCR", "Rule Audit", "Form Prefill", "Workflow Planning"],
     }
+
+
+"""
+
+"""

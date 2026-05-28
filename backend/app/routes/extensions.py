@@ -6,26 +6,31 @@
 import json
 from datetime import datetime
 
-from fastapi import APIRouter
+from fastapi import APIRouter, HTTPException
 from fastapi.responses import PlainTextResponse
 
-from app.config import settings
+from app.schemas import ModelProviderRequest
+from app.services.llm_service import model_runtime_status, set_active_provider
 
 router = APIRouter(prefix="/extensions", tags=["extensions"])
 
 
 @router.get("/model/check")
 def check_model_runtime():
-    return {
-        "mode": "demo" if settings.DEMO_MODE else "real",
-        "api_key_configured": bool(settings.OPENAI_API_KEY),
-        "base_url": settings.OPENAI_BASE_URL,
-        "llm_model": settings.LLM_MODEL,
-        "embedding_model": settings.EMBEDDING_MODEL,
-        "local_model_compatible": True,
-        "checked_at": datetime.now().isoformat(),
-        "suggestion": "如需本地国产模型，将 OPENAI_BASE_URL 指向本地 OpenAI-compatible 服务，并设置 LLM_MODEL。",
-    }
+    status = model_runtime_status()
+    status["checked_at"] = datetime.now().isoformat()
+    status["suggestion"] = "可在 .env 中同时配置 DeepSeek 和本地 Qwen，前端只切换 provider，不保存 API Key。"
+    return status
+
+
+@router.post("/model/provider")
+def switch_model_provider(req: ModelProviderRequest):
+    try:
+        status = set_active_provider(req.provider)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    status["checked_at"] = datetime.now().isoformat()
+    return status
 
 
 @router.get("/agent-graph")
@@ -58,9 +63,9 @@ def get_agent_graph():
 @router.get("/datasets/faq.jsonl", response_class=PlainTextResponse)
 def export_faq_dataset():
     samples = [
-        {"instruction": "单人能否参赛？", "output": "不能。通知要求每队 3-5 人，并确定 1 名队长。", "scenario": "competition_registration"},
-        {"instruction": "报名截止时间是什么？", "output": "报名截止时间为 5 月 12 日 18:00。", "scenario": "competition_registration"},
-        {"instruction": "作品提交截止时间是什么？", "output": "作品提交截止时间为 5 月 30 日。", "scenario": "competition_registration"},
+        {"instruction": "这个事项的办理条件是什么？", "output": "请根据选中的制度或通知原文回答，并列出引用依据。", "scenario": "generic"},
+        {"instruction": "需要提交哪些材料？", "output": "请从选中文件中提取材料清单；证据不足时说明不确定。", "scenario": "generic"},
+        {"instruction": "截止时间是什么？", "output": "请从选中文件中查找截止时间，并返回对应引用片段。", "scenario": "generic"},
         {"instruction": "请假审批需要哪些材料？", "output": "通常需要请假申请、请假原因说明和相应证明材料。", "scenario": "leave_approval"},
         {"instruction": "报销申请要核验哪些内容？", "output": "需要核验票据、金额、申请人、事项说明和审批附件。", "scenario": "reimbursement"},
     ]
@@ -81,7 +86,7 @@ def export_ocr_field_dataset():
 def export_rule_dataset():
     samples = {
         "competition_registration": [
-            {"field": "team_size", "operator": "between", "expected": [3, 5], "severity": "high", "suggestion": "队伍人数需控制在 3-5 人。"},
+            {"field": "team_size", "operator": "between", "expected": ["按制度配置"], "severity": "high", "suggestion": "队伍人数需符合当前制度或规则配置。"},
             {"field": "email", "operator": "required", "severity": "high", "suggestion": "补充可接收通知的邮箱。"},
         ],
         "leave_approval": [
@@ -103,13 +108,19 @@ def local_model_guide():
 1. 启动本地 OpenAI-compatible 推理服务，例如 vLLM、Ollama OpenAI API、LMDeploy。
 2. 在 backend/.env 中设置：
 
-OPENAI_BASE_URL=http://127.0.0.1:8001/v1
-OPENAI_API_KEY=local-key
-LLM_MODEL=qwen2.5-7b-instruct
 DEMO_MODE=false
+MODEL_PROVIDER=deepseek
+
+DEEPSEEK_BASE_URL=https://api.deepseek.com/v1
+DEEPSEEK_API_KEY=your-deepseek-key
+DEEPSEEK_LLM_MODEL=deepseek-chat
+
+QWEN_BASE_URL=http://127.0.0.1:8001/v1
+QWEN_API_KEY=local-key
+QWEN_LLM_MODEL=qwen2.5-7b-instruct
 
 3. 重启后端服务。
-4. 打开“拓展选择 -> 检测模型配置”，确认 base_url 和模型名称已切换。
+4. 打开“系统设置 -> 应用模型”，选择 DeepSeek API 或本地 Qwen。
 
 建议模型小于 70B，并优先选择 Qwen、DeepSeek、Baichuan、ChatGLM 等国产模型。
 """

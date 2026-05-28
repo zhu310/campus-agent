@@ -48,7 +48,6 @@ FIELD_LABELS = {
 }
 
 DEFAULT_REQUIRED_FIELDS = ["name", "phone", "email", "project_name", "team_size"]
-ENGLISH_SPEECH_REQUIRED_FIELDS = ["project_name", "team_members", "school", "college_class", "email", "phone"]
 
 SCENARIO_REQUIRED_FIELDS = {key: value["required_fields"] for key, value in FIELD_SCHEMAS.items()}
 SCENARIO_FIELD_PRIORITIES = {key: value["field_priorities"] for key, value in FIELD_SCHEMAS.items()}
@@ -546,16 +545,6 @@ def _should_use_llm_fallback(structure: dict[str, Any], open_fields: dict[str, A
     return bool(quality.get("needs_human_review")) or (_is_generic_scenario(scenario) and not open_fields)
 
 
-def _detect_material_type(text: str) -> str:
-    if "英语摘要" in text or "科研诚信保证" in text or "作品标题" in text and "Title" in text:
-        return "科研英语演讲报名表"
-    if "实践周志" in text or "思想政治理论课综合实践" in text:
-        return "实践周志"
-    if "报名表" in text:
-        return "报名表"
-    return "通用办理材料"
-
-
 def _parse_team_members(value: str) -> list[str]:
     cleaned = _clean_value(value)
     if not cleaned:
@@ -586,8 +575,6 @@ def _derive_team_fields(fields: Dict[str, Any]) -> None:
 def _required_fields_for(fields: Dict[str, Any], scenario: str = "competition_registration") -> list[str]:
     if _is_generic_scenario(scenario):
         return []
-    if fields.get("material_type") == "科研英语演讲报名表":
-        return ENGLISH_SPEECH_REQUIRED_FIELDS
     return scenario_schema(scenario)["required_fields"]
 
 
@@ -626,7 +613,6 @@ def merge_field_details(text: str, extra_fields: Dict[str, Any] | None = None, s
             open_fields.setdefault(key, value)
     if synonym_fields:
         recognized_fields["synonym_fields"] = synonym_fields
-    recognized_fields["material_type"] = _detect_material_type(cleaned)
     recognized_fields["scenario"] = scenario
 
     mapped_labels = {_clean_label(item.get("original_label", "")) for item in field_matches}
@@ -661,7 +647,6 @@ def seed_default_rules(db) -> None:
         {"rule_name": "必填-联系方式", "scenario": "competition_registration", "field_name": "phone", "operator": "required", "expected_value": None, "severity": "high", "suggestion": "补充联系电话。"},
         {"rule_name": "必填-邮箱", "scenario": "competition_registration", "field_name": "email", "operator": "required", "expected_value": None, "severity": "high", "suggestion": "补充接收通知的邮箱。"},
         {"rule_name": "必填-项目名称", "scenario": "competition_registration", "field_name": "project_name", "operator": "required", "expected_value": None, "severity": "high", "suggestion": "补充作品或项目名称。"},
-        {"rule_name": "人数范围-3到5人", "scenario": "competition_registration", "field_name": "team_size", "operator": "between", "expected_value": "3,5", "severity": "high", "suggestion": "团队人数需控制在 3 到 5 人。"},
         {"rule_name": "建议-指导老师", "scenario": "competition_registration", "field_name": "advisor", "operator": "recommended", "expected_value": None, "severity": "medium", "suggestion": "建议补充指导老师。"},
         {"rule_name": "必填-请假人姓名", "scenario": "leave_approval", "field_name": "name", "operator": "required", "expected_value": None, "severity": "high", "suggestion": "补充请假人姓名。"},
         {"rule_name": "必填-请假原因", "scenario": "leave_approval", "field_name": "leave_reason", "operator": "required", "expected_value": None, "severity": "high", "suggestion": "补充请假原因。"},
@@ -690,6 +675,13 @@ def seed_default_rules(db) -> None:
             rule.enabled = True
         else:
             db.add(RulePolicy(**rule_data))
+    db.query(RulePolicy).filter(
+        RulePolicy.rule_name == "人数范围-3到5人",
+        RulePolicy.scenario == "competition_registration",
+        RulePolicy.field_name == "team_size",
+        RulePolicy.operator == "between",
+        RulePolicy.expected_value == "3,5",
+    ).update({"enabled": False})
     db.commit()
 
 

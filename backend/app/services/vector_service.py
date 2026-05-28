@@ -30,11 +30,18 @@ def ensure_collection(vector_size: int):
 
 def upsert_chunks(points: list[models.PointStruct]):
     if points:
-        client.upsert(collection_name=settings.QDRANT_COLLECTION, points=points)
+        try:
+            client.upsert(collection_name=settings.QDRANT_COLLECTION, points=points)
+        except Exception:
+            # Qdrant is an acceleration layer here. SQL chunks remain the reliable fallback.
+            return
 
 
 def search(query_vector: list[float], limit: int = 5, document_ids: list[int] | None = None):
-    ensure_collection(len(query_vector))
+    try:
+        ensure_collection(len(query_vector))
+    except Exception:
+        return []
     query_filter = None
     if document_ids:
         query_filter = models.Filter(
@@ -45,13 +52,16 @@ def search(query_vector: list[float], limit: int = 5, document_ids: list[int] | 
                 )
             ]
         )
-    return client.search(
-        collection_name=settings.QDRANT_COLLECTION,
-        query_vector=query_vector,
-        limit=limit,
-        with_payload=True,
-        query_filter=query_filter,
-    )
+    try:
+        return client.search(
+            collection_name=settings.QDRANT_COLLECTION,
+            query_vector=query_vector,
+            limit=limit,
+            with_payload=True,
+            query_filter=query_filter,
+        )
+    except Exception:
+        return []
 
 
 def rerank_hits(question: str, hits: List[Any], top_k: int = 5) -> List[Dict[str, Any]]:

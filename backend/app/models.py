@@ -30,6 +30,34 @@ class SessionRecord(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
 
 
+class SessionEvent(Base):
+    """Append-only events that let a workflow session be restored later."""
+
+    __tablename__ = "session_events"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    session_id: Mapped[int] = mapped_column(ForeignKey("sessions.id"), index=True)
+    event_type: Mapped[str] = mapped_column(String(80))
+    title: Mapped[str] = mapped_column(String(255))
+    payload: Mapped[dict] = mapped_column(JSON)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+
+class UserMemory(Base):
+    """User-confirmed long-term memory for reusable profile information."""
+
+    __tablename__ = "user_memories"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    key: Mapped[str] = mapped_column(String(120), index=True)
+    value: Mapped[str] = mapped_column(Text)
+    category: Mapped[str] = mapped_column(String(80), default="profile")
+    source: Mapped[str] = mapped_column(String(80), default="user_confirmed")
+    confirmed: Mapped[bool] = mapped_column(Boolean, default=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+
 class Document(Base):
     """上传或内置导入的源文件，保存解析后的完整文本。"""
 

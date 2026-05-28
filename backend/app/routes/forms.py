@@ -7,8 +7,10 @@ from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 
 from app.db.session import get_db
-from app.models import FormFillResult, FormTemplate, ToolLog
-from app.schemas import FormFillRequest, FormFillResponse
+from app.models import Document, FormFillResult, FormTemplate, ToolLog
+from app.schemas import FillAssistantRequest, FillAssistantResponse, FillReviewRequest, FillReviewResponse, FormFillRequest, FormFillResponse
+from app.services.session_service import add_session_event
+from app.services.notice_task_service import generate_fill_assistant, review_filled_content
 from app.services.form_service import FORM_TEMPLATE, FORM_TEMPLATES, prefill_form
 
 router = APIRouter(prefix="/forms", tags=["forms"])
@@ -48,5 +50,69 @@ def form_prefill(req: FormFillRequest, db: Session = Depends(get_db)):
             output_payload={"missing_fields": result["missing_fields"]},
         )
     )
+    if req.session_id:
+        add_session_event(
+            db,
+            req.session_id,
+            req.scenario,
+            "form",
+            "表单预填",
+            {"result": result, "document_ids": req.document_ids},
+        )
     db.commit()
     return FormFillResponse(**result)
+
+
+@router.post("/assist", response_model=FillAssistantResponse)
+def form_assist(req: FillAssistantRequest, db: Session = Depends(get_db)):
+    docs = db.query(Document).filter(Document.id.in_(req.document_ids)).all() if req.document_ids else []
+    result = generate_fill_assistant(docs, req.user_profile, req.form_text, req.draft_content, req.scenario)
+    db.add(
+        ToolLog(
+            task_name="填写助手",
+            tool_name="fill_assistant",
+            status="fallback" if result.get("fallback_used") else "completed",
+            input_payload={"document_ids": req.document_ids, "scenario": req.scenario},
+            output_payload={
+                "required_information": len(result.get("required_information", [])),
+                "draft_sections": len(result.get("draft_sections", [])),
+            },
+        )
+    )
+    if req.session_id:
+        add_session_event(
+            db,
+            req.session_id,
+            req.scenario,
+            "fill_assist",
+            "填写助手",
+            {"result": result, "document_ids": req.document_ids, "draft_content": req.draft_content},
+        )
+    db.commit()
+    return FillAssistantResponse(**result)
+
+
+@router.post("/review-draft", response_model=FillReviewResponse)
+def form_review_draft(req: FillReviewRequest, db: Session = Depends(get_db)):
+    docs = db.query(Document).filter(Document.id.in_(req.document_ids)).all() if req.document_ids else []
+    result = review_filled_content(docs, req.user_profile, req.draft_content, req.scenario)
+    db.add(
+        ToolLog(
+            task_name="填写审核",
+            tool_name="review_filled_content",
+            status="fallback" if result.get("fallback_used") else ("passed" if result.get("passed") else "issues"),
+            input_payload={"document_ids": req.document_ids, "scenario": req.scenario},
+            output_payload={"passed": result.get("passed"), "issues": len(result.get("issues", []))},
+        )
+    )
+    if req.session_id:
+        add_session_event(
+            db,
+            req.session_id,
+            req.scenario,
+            "fill_review",
+            "填写内容审核",
+            {"result": result, "document_ids": req.document_ids, "draft_content": req.draft_content},
+        )
+    db.commit()
+    return FillReviewResponse(**result)

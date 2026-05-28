@@ -17,6 +17,7 @@ from app.services.audit_service import audit_material, list_rules, merge_field_d
 from app.services.file_parser import extract_text_from_file
 from app.services.ocr_service import parse_ocr
 from app.services.security_service import redact_payload
+from app.services.session_service import add_session_event
 
 router = APIRouter(prefix="/audit", tags=["audit"])
 UPLOAD_DIR = Path("uploads")
@@ -51,6 +52,19 @@ def _run_audit(req: AuditRequest, db: Session) -> AuditResponse:
             }),
         )
     )
+    if req.session_id:
+        add_session_event(
+            db,
+            req.session_id,
+            req.scenario,
+            "audit",
+            "材料审核",
+            {
+                "material_name": req.material_name,
+                "result": redact_payload(result),
+                "document_ids": req.document_ids,
+            },
+        )
     db.commit()
     return AuditResponse(**result)
 
@@ -78,6 +92,19 @@ def extract_material_fields(req: ExtractFieldsRequest, db: Session = Depends(get
             output_payload=redact_payload({"fields": fields, "missing_fields": missing}),
         )
     )
+    if req.session_id:
+        add_session_event(
+            db,
+            req.session_id,
+            req.scenario,
+            "fields",
+            "信息抽取",
+            {
+                "fields": redact_payload(fields),
+                "missing_fields": missing,
+                "document_ids": req.document_ids,
+            },
+        )
     db.commit()
     return ExtractFieldsResponse(
         fields=fields,
@@ -96,6 +123,7 @@ def extract_material_fields(req: ExtractFieldsRequest, db: Session = Depends(get
 def audit_upload(
     file: UploadFile = File(...),
     scenario: str = Form("competition_registration"),
+    display_name: str | None = Form(None),
     db: Session = Depends(get_db),
 ):
     suffix = Path(file.filename or "").suffix.lower()
@@ -104,7 +132,8 @@ def audit_upload(
     saved_name = f"{uuid4().hex}{suffix}"
     file_path = UPLOAD_DIR / saved_name
     with open(file_path, "wb") as handle:
-        handle.write(file.file.read())
+        while chunk := file.file.read(1024 * 1024):
+            handle.write(chunk)
 
     if suffix in {".png", ".jpg", ".jpeg", ".bmp", ".webp", ".pdf"}:
         parsed = parse_ocr(str(file_path), scenario=scenario)
@@ -133,9 +162,10 @@ def audit_upload(
             "lines": [line for line in text.splitlines() if line.strip()],
             "fallback_used": False,
         }
+    visible_name = (display_name or "").strip() or file.filename or saved_name
     db.add(
         Document(
-            filename=file.filename or saved_name,
+            filename=visible_name,
             content=parsed["text"],
             source="upload",
             source_type="material",
@@ -148,13 +178,13 @@ def audit_upload(
             task_name="材料上传与OCR",
             tool_name="ocr_parse_file",
             status="fallback" if parsed["fallback_used"] else "completed",
-            input_payload={"filename": file.filename},
+            input_payload={"filename": visible_name, "original_filename": file.filename},
             output_payload=redact_payload({"lines": len(parsed["lines"]), "fields": parsed["extracted_fields"]}),
         )
     )
     db.commit()
     return OCRResponse(
-        filename=file.filename or saved_name,
+        filename=visible_name,
         engine=parsed["engine"],
         text=parsed["text"],
         extracted_fields=parsed["extracted_fields"],
