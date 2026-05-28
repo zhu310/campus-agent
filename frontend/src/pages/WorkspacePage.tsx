@@ -244,7 +244,7 @@ export default function WorkspacePage({ initialScenario = '比赛报名' }: Work
   const ensureActiveSession = async () => {
     if (activeSessionId) return activeSessionId
     const res = await api.post<SessionItem>('/sessions', {
-      name: question || '新的办理会话',
+      name: '新建对话',
       scenario: scenarioCode,
       document_ids: selectedKnowledgeIds,
     })
@@ -266,7 +266,7 @@ export default function WorkspacePage({ initialScenario = '比赛报名' }: Work
 
   const startNewSession = async () => {
     const res = await api.post<SessionItem>('/sessions', {
-      name: question || '新的办理会话',
+      name: '新建对话',
       scenario: scenarioCode,
       document_ids: selectedKnowledgeIds,
     })
@@ -435,11 +435,28 @@ export default function WorkspacePage({ initialScenario = '比赛报名' }: Work
   }
 
   const loadMaterial = async (id: number) => {
+    if (selectedMaterialId === id) {
+      clearSelectedMaterial()
+      return
+    }
     setSelectedMaterialId(id)
     const res = await api.get<DocumentDetail>(`/documents/${id}`)
     setPreviewDocument(res.data)
     setMaterialText(res.data.content || '')
     setActivePanel('preview')
+  }
+
+  const clearSelectedKnowledge = () => {
+    setSelectedKnowledgeIds([])
+    updateActiveSessionDocuments([]).catch(() => undefined)
+  }
+
+  const clearSelectedMaterial = () => {
+    setSelectedMaterialId(null)
+    if (previewDocument?.source_type === 'material') {
+      setPreviewDocument(null)
+    }
+    setMaterialText('')
   }
 
   const deleteDocument = async (id: number) => {
@@ -455,10 +472,6 @@ export default function WorkspacePage({ initialScenario = '比赛报名' }: Work
     event.stopPropagation()
     const res = await api.get<DocumentDetail>(`/documents/${id}`)
     setPreviewDocument(res.data)
-    if (res.data.source_type === 'material' || res.data.source_type === 'both') {
-      setSelectedMaterialId(id)
-      setMaterialText(res.data.content || '')
-    }
     setActivePanel('preview')
   }
 
@@ -473,6 +486,12 @@ export default function WorkspacePage({ initialScenario = '比赛报名' }: Work
     const file = options.file as File
     const suffix = file.name.split('.').pop()?.toLowerCase() || ''
     const isImage = ['png', 'jpg', 'jpeg', 'bmp', 'webp'].includes(suffix)
+    const shouldUseMaterialParser = isImage || (suffix === 'pdf' && uploadMode === 'material')
+    if (suffix === 'doc') {
+      message.error('暂不支持 .doc 老 Word 格式，请另存为 .docx、PDF 或 txt 后上传。')
+      options.onError?.(new Error('Unsupported .doc file'))
+      return
+    }
     const form = new FormData()
     form.append('file', file)
     form.append('scenario', scenarioCode)
@@ -481,7 +500,7 @@ export default function WorkspacePage({ initialScenario = '比赛报名' }: Work
     }
     setLoadingAction('upload')
     try {
-      if (isImage) {
+      if (shouldUseMaterialParser) {
         const res = await api.post<OCRResponse>('/audit/upload', form)
         setOcrResult(res.data)
         setMaterialText(res.data.text)
@@ -491,6 +510,8 @@ export default function WorkspacePage({ initialScenario = '比赛报名' }: Work
         form.append('source_type', uploadMode)
         const res = await api.post('/documents/upload', form)
         const id = res.data.document_id as number
+        const detail = await api.get<DocumentDetail>(`/documents/${id}`)
+        setPreviewDocument(detail.data)
         if (uploadMode === 'knowledge_base' || uploadMode === 'both') {
           const nextIds = Array.from(new Set([...selectedKnowledgeIds, id]))
           setSelectedKnowledgeIds(nextIds)
@@ -498,7 +519,7 @@ export default function WorkspacePage({ initialScenario = '比赛报名' }: Work
         }
         if (uploadMode === 'material' || uploadMode === 'both') {
           setSelectedMaterialId(id)
-          await loadMaterial(id)
+          setMaterialText(detail.data.content || '')
         }
       }
       message.success(`${file.name} 上传成功`)
@@ -729,8 +750,12 @@ export default function WorkspacePage({ initialScenario = '比赛报名' }: Work
     try {
       const sessionId = await ensureActiveSession()
       const draft = fillAssistantResult?.draft_sections.map((item) => `${item.field_name}：\n${item.draft}`).join('\n\n') || materialText
+      const reviewDocumentIds = Array.from(new Set([
+        ...selectedKnowledgeIds,
+        ...(selectedMaterialId ? [selectedMaterialId] : []),
+      ]))
       const res = await api.post<FillReviewResponse>('/forms/review-draft', {
-        document_ids: selectedKnowledgeIds,
+        document_ids: reviewDocumentIds,
         user_profile: materialText,
         draft_content: draft,
         scenario: scenarioCode,
@@ -1041,7 +1066,7 @@ export default function WorkspacePage({ initialScenario = '比赛报名' }: Work
                 placeholder="文件显示名称，如：2026 智能体比赛通知"
                 style={{ marginBottom: 10 }}
               />
-              <Upload.Dragger className="compact-uploader" customRequest={handleUpload} showUploadList={false} accept=".png,.jpg,.jpeg,.bmp,.webp,.pdf,.docx,.txt,.md">
+              <Upload.Dragger className="compact-uploader" customRequest={handleUpload} showUploadList={false} accept=".png,.jpg,.jpeg,.bmp,.webp,.pdf,.docx,.txt,.md,.doc">
                 <p className="ant-upload-drag-icon"><InboxOutlined /></p>
                 <p className="ant-upload-text">上传{sourceTypeLabel(uploadMode)}</p>
                 <p className="ant-upload-hint">上传后在下方勾选或查看</p>
@@ -1049,7 +1074,10 @@ export default function WorkspacePage({ initialScenario = '比赛报名' }: Work
               <Button block style={{ marginTop: 10 }} loading={loadingAction === 'demo'} onClick={importDemoNotice}>导入示例通知</Button>
 
               <Divider />
-              <Title level={5}>制度/通知</Title>
+              <Space align="center" style={{ justifyContent: 'space-between', width: '100%' }}>
+                <Title level={5} style={{ marginBottom: 0 }}>制度/通知</Title>
+                <Button size="small" type="text" disabled={!selectedKnowledgeIds.length} onClick={clearSelectedKnowledge}>清空</Button>
+              </Space>
               <Checkbox.Group
                 value={selectedKnowledgeIds}
                 onChange={(values) => {
@@ -1071,13 +1099,18 @@ export default function WorkspacePage({ initialScenario = '比赛报名' }: Work
               </Checkbox.Group>
 
               <Divider />
-              <Title level={5}>办理材料</Title>
+              <Space align="center" style={{ justifyContent: 'space-between', width: '100%' }}>
+                <Title level={5} style={{ marginBottom: 0 }}>办理材料</Title>
+                <Button size="small" type="text" disabled={!selectedMaterialId} onClick={clearSelectedMaterial}>清空</Button>
+              </Space>
               <List size="small" dataSource={materialDocs} locale={{ emptyText: <Empty description="暂无办理材料" image={Empty.PRESENTED_IMAGE_SIMPLE} /> }} renderItem={(item) => (
-                <List.Item onClick={() => loadMaterial(item.id)} className={`${selectedMaterialId === item.id ? 'selected-file-row' : 'file-row'} file-management-row`}>
-                  <Space direction="vertical" size={2} className="file-row-main">
-                    <Text strong={selectedMaterialId === item.id}>{item.filename}</Text>
-                    <Text type="secondary">{dayjs(item.created_at).format('MM-DD HH:mm')}</Text>
-                  </Space>
+                <List.Item className={`${selectedMaterialId === item.id ? 'selected-file-row' : 'file-row'} file-management-row`}>
+                  <Checkbox checked={selectedMaterialId === item.id} className="file-row-main" onChange={() => loadMaterial(item.id)}>
+                    <Space direction="vertical" size={2}>
+                      <Text strong={selectedMaterialId === item.id}>{item.filename}</Text>
+                      <Text type="secondary">{dayjs(item.created_at).format('MM-DD HH:mm')}</Text>
+                    </Space>
+                  </Checkbox>
                   <Space size={4} onMouseDown={(event) => event.stopPropagation()} onClick={(event) => event.stopPropagation()}>
                     <Button size="small" type="text" onMouseDown={(event) => event.stopPropagation()} onClick={(event) => previewDocumentFile(event, item.id)}>查看</Button>
                     <Button danger size="small" type="text" icon={<DeleteOutlined />} onMouseDown={(event) => event.stopPropagation()} onClick={(event) => confirmDeleteDocument(event, item.id)} />
@@ -1090,10 +1123,10 @@ export default function WorkspacePage({ initialScenario = '比赛报名' }: Work
                 <Title level={5} style={{ marginBottom: 0 }}>最近任务</Title>
                 <Button size="small" onClick={startNewSession}>新建对话</Button>
               </Space>
-              <List size="small" dataSource={sessions.slice(0, 8)} locale={{ emptyText: '暂无可恢复会话' }} renderItem={(item) => (
+              <List size="small" dataSource={sessions.slice(0, 8)} locale={{ emptyText: '暂无可恢复会话' }} renderItem={(item, index) => (
                 <List.Item className="recent-session-row" onClick={() => restoreSession(item.id)}>
                   <div className="session-row-main">
-                    <Space><Tag color={activeSessionId === item.id ? 'blue' : 'default'}>{item.id}</Tag><Text strong>{item.name}</Text></Space>
+                    <Space><Tag color={activeSessionId === item.id ? 'blue' : 'default'}>{index + 1}</Tag><Text strong>{item.name}</Text></Space>
                     <div><Text type="secondary">{item.summary || '暂无摘要'}</Text></div>
                   </div>
                   <Space size={4} onMouseDown={(event) => event.stopPropagation()} onClick={(event) => event.stopPropagation()}>

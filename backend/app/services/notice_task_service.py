@@ -8,6 +8,7 @@ from typing import Any
 
 from app.config import settings
 from app.models import Document
+from app.services.audit_service import merge_field_details, missing_field_labels
 from app.services.llm_service import chat_completion
 
 
@@ -248,12 +249,31 @@ def generate_fill_assistant(docs: list[Document], user_profile: str, form_text: 
 
 
 def review_filled_content(docs: list[Document], user_profile: str, draft_content: str, scenario: str) -> dict[str, Any]:
+    evidence = _line_evidence(docs[0], ["要求", "材料", "填写", "提交", "附件"]) if docs else []
+    material_hints = _extract_material_hints("\n".join(doc.content or "" for doc in docs))
+    field_details = merge_field_details(draft_content, scenario=scenario) if draft_content.strip() else {"recognized_fields": {}}
+    missing_fields = missing_field_labels(field_details.get("recognized_fields", {}), scenario)
+    issues: list[str] = []
+    suggestions: list[str] = []
+    if not draft_content.strip():
+        issues.append("未检测到可审核的草稿内容。")
+        suggestions.append("请先在材料预览框中粘贴或选择需要审核的申请/报名内容。")
+    if missing_fields:
+        issues.append(f"材料缺少或未识别到必填信息：{'、'.join(missing_fields)}。")
+        suggestions.append("请补齐上述必填字段后再提交或继续生成表单。")
+    if material_hints and draft_content.strip():
+        missing_hints = [hint for hint in material_hints[:6] if hint[:12] not in draft_content]
+        if missing_hints:
+            issues.append("草稿中可能未覆盖通知提到的部分材料或附件要求。")
+            suggestions.extend([f"请核对：{item}" for item in missing_hints[:3]])
+    if not docs:
+        suggestions.append("当前未选择引用文件，已仅按场景必填字段做基础审核。")
     fallback = {
-        "passed": False,
-        "conclusion": "模型不可用，无法完成基于通知要求的语义审核；请人工核对引用原文、个人信息和草稿内容。",
-        "issues": ["未执行 LLM 审核"],
-        "suggestions": ["开启模型服务后重新审核，或人工逐项核对通知要求。"],
-        "evidence": _line_evidence(docs[0], ["要求", "材料", "填写"]) if docs else [],
+        "passed": not issues and bool(draft_content.strip()),
+        "conclusion": "已完成本地基础审核；当前未调用大模型语义审核，请人工复核关键要求。" if not issues else "本地基础审核发现需要补充或核对的内容。",
+        "issues": issues,
+        "suggestions": suggestions or ["本地未发现明显缺项；建议人工核对截止时间、提交入口和附件要求。"],
+        "evidence": evidence,
         "fallback_used": True,
     }
     if settings.DEMO_MODE:

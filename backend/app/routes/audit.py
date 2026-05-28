@@ -127,6 +127,8 @@ def audit_upload(
     db: Session = Depends(get_db),
 ):
     suffix = Path(file.filename or "").suffix.lower()
+    if suffix == ".doc":
+        raise HTTPException(status_code=400, detail="暂不支持 .doc 老 Word 格式，请另存为 .docx、PDF 或 txt 后上传。")
     if suffix not in {".png", ".jpg", ".jpeg", ".bmp", ".webp", ".pdf", ".docx", ".txt", ".md"}:
         raise HTTPException(status_code=400, detail="办理材料支持 png/jpg/jpeg/bmp/webp/pdf/docx/txt/md。")
     saved_name = f"{uuid4().hex}{suffix}"
@@ -137,6 +139,12 @@ def audit_upload(
 
     if suffix in {".png", ".jpg", ".jpeg", ".bmp", ".webp", ".pdf"}:
         parsed = parse_ocr(str(file_path), scenario=scenario)
+        if not parsed.get("text", "").strip():
+            if file_path.exists():
+                file_path.unlink()
+            if suffix == ".pdf":
+                raise HTTPException(status_code=400, detail="PDF 中未解析到可复制文本；如果是扫描版 PDF，请先转为图片或使用 OCR 工具识别后再上传。")
+            raise HTTPException(status_code=400, detail="图片 OCR 未解析到文本，请确认图片清晰或 OCR 依赖已安装。")
     else:
         try:
             text = extract_text_from_file(str(file_path))

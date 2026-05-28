@@ -152,8 +152,10 @@ def upload_document(
     db: Session = Depends(get_db),
 ):
     suffix = Path(file.filename or "").suffix.lower()
+    if suffix == ".doc":
+        raise HTTPException(status_code=400, detail="暂不支持 .doc 老 Word 格式，请另存为 .docx、PDF 或 txt 后上传。")
     if suffix not in {".pdf", ".docx", ".txt", ".md"}:
-        raise HTTPException(status_code=400, detail="Only pdf/docx/txt/md are supported.")
+        raise HTTPException(status_code=400, detail="仅支持 pdf/docx/txt/md。")
 
     saved_name = f"{uuid4().hex}{suffix}"
     file_path = UPLOAD_DIR / saved_name

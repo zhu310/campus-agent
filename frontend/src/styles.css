@@ -479,8 +479,31 @@ body {
   margin-bottom: 8px;
 }
 
+.file-center-panel .compact-uploader,
+.file-center-panel .compact-uploader .ant-upload,
+.file-center-panel .compact-uploader .ant-upload-drag,
+.file-center-panel .compact-uploader .ant-upload-btn,
+.file-center-panel .compact-uploader .ant-upload-drag-container {
+  height: 112px !important;
+  min-height: 112px !important;
+  max-height: 112px !important;
+}
+
+.file-center-panel .compact-uploader {
+  display: block !important;
+  flex: 0 0 112px !important;
+  margin-bottom: 8px;
+}
+
 .file-center-panel .compact-uploader .ant-upload-drag {
-  padding: 8px 10px !important;
+  padding: 12px 10px !important;
+  display: flex !important;
+  align-items: center;
+  justify-content: center;
+}
+
+.file-center-panel .compact-uploader .ant-upload-btn {
+  padding: 0 !important;
 }
 
 .file-center-panel .ant-upload-drag-icon {
