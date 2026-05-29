@@ -27,6 +27,32 @@ const PROVIDERS = {
   },
 }
 
+function renderRuntimeValue(key: string, value: unknown) {
+  if (key.includes('api_key')) return value ? '已配置' : '未配置'
+  if (Array.isArray(value)) {
+    return (
+      <Space direction="vertical" size={4}>
+        {value.map((item, index) => {
+          if (!item || typeof item !== 'object') return <Text key={index}>{String(item)}</Text>
+          const data = item as Record<string, unknown>
+          return (
+            <Space key={index} wrap>
+              <Tag color={data.active ? 'blue' : 'default'}>{String(data.display_name || data.provider || index + 1)}</Tag>
+              <Text type="secondary">{String(data.llm_model || '')}</Text>
+              {data.embedding_model ? <Text type="secondary">Embedding: {String(data.embedding_model)}</Text> : null}
+              <Tag color={data.api_key_configured ? 'green' : 'orange'}>{data.api_key_configured ? '已配置' : '未配置'}</Tag>
+            </Space>
+          )
+        })}
+      </Space>
+    )
+  }
+  if (value && typeof value === 'object') {
+    return <pre style={{ margin: 0, whiteSpace: 'pre-wrap' }}>{JSON.stringify(value, null, 2)}</pre>
+  }
+  return String(value ?? '')
+}
+
 export default function ExtensionsPage() {
   const [modelCheck, setModelCheck] = useState<Record<string, unknown> | null>(null)
   const [provider, setProvider] = useState<keyof typeof PROVIDERS>('deepseek')
@@ -73,7 +99,7 @@ export default function ExtensionsPage() {
             <Descriptions title="当前后端模型状态" bordered size="small" column={1}>
               {Object.entries(modelCheck || {}).map(([key, value]) => (
                 <Descriptions.Item key={key} label={key}>
-                  {key.includes('api_key') ? (value ? '已配置' : '未配置') : String(value)}
+                  {renderRuntimeValue(key, value)}
                 </Descriptions.Item>
               ))}
             </Descriptions>

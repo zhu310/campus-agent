@@ -32,6 +32,23 @@ def _looks_like_label(value: str) -> bool:
     return bool(re.search(r"[\u4e00-\u9fffA-Za-z]", value))
 
 
+def _label_signature(value: str) -> str:
+    return re.sub(r"\s+", "", clean_cell(value)).lower()
+
+
+COMMON_FORM_LABELS = {
+    "姓名", "性别", "出生年月", "民族", "政治面貌", "入学时间", "学号", "所在年级",
+    "身份证号码", "联系电话", "学院", "学院系", "专业", "班", "曾获何种奖励",
+    "家庭人口总数", "家庭月总收入", "人均月收入", "收入来源", "家庭住址", "邮政编码",
+    "困难情况认定档次", "成绩排名", "申请理由", "申请人签名", "院系审核意见", "学校审核意见",
+}
+
+
+def _is_common_form_label(value: str) -> bool:
+    signature = _label_signature(value)
+    return signature in COMMON_FORM_LABELS or any(label in signature and len(signature) <= len(label) + 4 for label in COMMON_FORM_LABELS)
+
+
 def _location(line_no: int, page: int | None = None) -> str:
     if page:
         return f"第 {page} 页，第 {line_no} 行"
@@ -147,7 +164,7 @@ def _extract_table_kv_blocks(table_blocks: list[dict[str, Any]]) -> list[dict[st
                 label = clean_cell(row[index])
                 value = clean_cell(row[index + 1])
                 pairwise_row = len(row) % 2 == 0
-                if _looks_like_label(label) and value and (pairwise_row or not _looks_like_label(value)):
+                if _looks_like_label(label) and value and not _is_common_form_label(value) and (pairwise_row or not _looks_like_label(value)):
                     line_no = int(table.get("line") or 1) + row_index
                     blocks.append(
                         {

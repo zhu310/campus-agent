@@ -176,9 +176,10 @@ def upload_document(
         raise HTTPException(status_code=400, detail="文件中未解析到可用文本，请确认文件不是空白模板或扫描图片。")
 
     visible_name = (display_name or "").strip() or file.filename or saved_name
-    source_types = {item.strip() for item in source_type.split(",") if item.strip()}
-    should_index = bool(source_types) or source_type == "both"
-    stored_source_type = "both" if should_index and ("material" in source_types or source_type == "both") else source_type
+    allowed_source_types = {"knowledge_base", "material", "both", "data_analysis"}
+    stored_source_type = source_type if source_type in allowed_source_types else "knowledge_base"
+    # 分类决定前端展示位置；索引决定后续检索能力。两者不能混在一起。
+    should_index = stored_source_type in {"knowledge_base", "material", "both", "data_analysis"}
 
     doc = Document(
         filename=visible_name,
@@ -215,7 +216,7 @@ def upload_document(
 
 @router.post("/index-text", response_model=UploadResponse)
 def index_text(filename: str, text: str, scenario: str = "competition_registration", db: Session = Depends(get_db)):
-    doc = Document(filename=filename, content=text, source="seed", source_type="knowledge_base", scenario=scenario)
+    doc = Document(filename=filename, content=text, source="manual_text", source_type="knowledge_base", scenario=scenario)
     db.add(doc)
     db.commit()
     db.refresh(doc)

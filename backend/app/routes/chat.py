@@ -98,6 +98,7 @@ def _lexical_hits(query: str, docs: dict[int, str], chunks: list[DocumentChunk],
                 "score": 0.0,
                 "rerank_score": float(score) + 10.0,
                 "location": "SQL切片",
+                "retrieval_source": "sql_lexical",
             }
         )
     ranked.sort(key=lambda item: item["rerank_score"], reverse=True)
@@ -148,7 +149,7 @@ def _top_documents(hits: list[dict[str, Any]], top_n: int = 3) -> list[int]:
     return [doc_id for _, doc_id in scored[:top_n]]
 
 
-def _retrieve(req: AskRequest, db: Session) -> tuple[list[dict[str, Any]], list[str], list[int]]:
+def _retrieve(req: AskRequest, db: Session) -> tuple[list[dict[str, Any]], list[str], list[int], dict[str, Any]]:
     docs, chunks = _load_chunks(req, db)
     queries = _decompose_question(req.question)
     all_hits: list[dict[str, Any]] = []
@@ -163,7 +164,15 @@ def _retrieve(req: AskRequest, db: Session) -> tuple[list[dict[str, Any]], list[
 
     top_doc_ids = _top_documents(all_hits, top_n=3)
     focused_hits = [item for item in all_hits if int(item.get("document_id") or 0) in top_doc_ids]
-    return _merge_hits(focused_hits or all_hits, settings.TOP_K), queries, top_doc_ids
+    merged = _merge_hits(focused_hits or all_hits, settings.TOP_K)
+    meta = {
+        "query_count": len(queries),
+        "vector_hits": sum(1 for item in all_hits if item.get("retrieval_source") == "vector"),
+        "sql_lexical_hits": sum(1 for item in all_hits if item.get("retrieval_source") == "sql_lexical"),
+        "used_sql_fallback": any(item.get("retrieval_source") == "sql_lexical" for item in merged),
+        "used_vector": any(item.get("retrieval_source") == "vector" for item in merged),
+    }
+    return merged, queries, top_doc_ids, meta
 
 
 def _run_chat(req: AskRequest, db: Session) -> AskResponse:
@@ -172,7 +181,7 @@ def _run_chat(req: AskRequest, db: Session) -> AskResponse:
 
     plan = plan_user_request(req.question)
     intent = plan["intent"]
-    reranked, search_queries, top_doc_ids = _retrieve(req, db)
+    reranked, search_queries, top_doc_ids, retrieval_meta = _retrieve(req, db)
 
     citations = [
         Citation(
@@ -198,7 +207,10 @@ def _run_chat(req: AskRequest, db: Session) -> AskResponse:
         TraceStep(
             title="多问题混合检索",
             status="completed",
-            detail=f"拆分 {len(search_queries)} 个检索问题，重点分析文件ID：{top_doc_ids or '未命中'}",
+            detail=(
+                f"拆分 {len(search_queries)} 个检索问题，向量命中 {retrieval_meta['vector_hits']} 条，"
+                f"SQL文本命中 {retrieval_meta['sql_lexical_hits']} 条，重点分析文件ID：{top_doc_ids or '未命中'}"
+            ),
         ),
         TraceStep(
             title="答案生成",
@@ -226,7 +238,7 @@ def _run_chat(req: AskRequest, db: Session) -> AskResponse:
                 "document_ids": req.document_ids,
                 "session_id": req.session_id,
             },
-            output_payload={"citations": len(citations), "top_document_ids": top_doc_ids},
+            output_payload={"citations": len(citations), "top_document_ids": top_doc_ids, "retrieval": retrieval_meta},
         )
     )
     if req.session_id:
@@ -242,6 +254,7 @@ def _run_chat(req: AskRequest, db: Session) -> AskResponse:
                 "citations": [item.model_dump() for item in citations],
                 "document_ids": req.document_ids,
                 "trace": [item.model_dump() for item in trace],
+                "retrieval": retrieval_meta,
             },
         )
     db.commit()

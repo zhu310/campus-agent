@@ -70,6 +70,8 @@ class AskResponse(BaseModel):
 
 
 class OCRResponse(BaseModel):
+    document_id: Optional[int] = None
+    chunks_indexed: int = 0
     filename: str
     engine: str
     text: str
@@ -156,11 +158,13 @@ class FormFillResponse(BaseModel):
     fields: Dict[str, Any]
     template_name: str
     missing_fields: List[str]
+    quality: Dict[str, Any] = Field(default_factory=dict)
     source_structure: Dict[str, Any] = Field(default_factory=dict)
     prefill_tables: List[Dict[str, Any]] = Field(default_factory=list)
     open_fields: Dict[str, Any] = Field(default_factory=dict)
     prefill_sources: Dict[str, Any] = Field(default_factory=dict)
     review_fields: List[str] = Field(default_factory=list)
+    quality_warnings: List[str] = Field(default_factory=list)
     raw_fields: List[Dict[str, Any]] = Field(default_factory=list)
     field_matches: List[Dict[str, Any]] = Field(default_factory=list)
     unmapped_fields: List[Dict[str, Any]] = Field(default_factory=list)
@@ -214,6 +218,7 @@ class WorkflowResponse(BaseModel):
     steps: List[WorkflowStep]
     required_materials: List[str]
     risk_reminders: List[str]
+    fallback_used: bool = False
 
 
 class NoticeTaskRequest(BaseModel):
@@ -270,23 +275,6 @@ class FillAssistantResponse(BaseModel):
     questions: List[str] = Field(default_factory=list)
     draft_sections: List[DraftSection] = Field(default_factory=list)
     risks: List[str] = Field(default_factory=list)
-    evidence: List[NoticeEvidence] = Field(default_factory=list)
-    fallback_used: bool = False
-
-
-class FillReviewRequest(BaseModel):
-    document_ids: List[int] = Field(default_factory=list)
-    user_profile: str = ""
-    draft_content: str = ""
-    scenario: str = "general"
-    session_id: Optional[int] = None
-
-
-class FillReviewResponse(BaseModel):
-    passed: bool
-    conclusion: str
-    issues: List[str] = Field(default_factory=list)
-    suggestions: List[str] = Field(default_factory=list)
     evidence: List[NoticeEvidence] = Field(default_factory=list)
     fallback_used: bool = False
 
@@ -405,12 +393,6 @@ class RulePolicyItem(BaseModel):
     expected_value: Optional[str]
     severity: str
     suggestion: str
-
-
-class DemoAsset(BaseModel):
-    name: str
-    type: str
-    content: str
 
 
 class AgentRunRequest(BaseModel):

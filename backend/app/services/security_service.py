@@ -4,9 +4,7 @@ from __future__ import annotations
 
 import re
 from typing import Any
-"""
-文件的内容都要按照逻辑上传数据库和向量库呀，不然怎么调用后续工具函数等逻辑呢，那这个智能体的效果就很差了呀
-"""
+
 
 PHONE_RE = re.compile(r"1[3-9]\d{9}")
 EMAIL_RE = re.compile(r"([A-Za-z0-9._%+-]{2})[A-Za-z0-9._%+-]*(@[A-Za-z0-9.-]+\.[A-Za-z]{2,})")

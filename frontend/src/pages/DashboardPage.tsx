@@ -46,7 +46,6 @@ export default function DashboardPage({ onStart }: Props) {
           </Paragraph>
           <Space wrap>
             <Button type="primary" size="large" icon={<RocketOutlined />} onClick={() => onStart('比赛报名')}>进入智能办理</Button>
-            <Button size="large" href="http://localhost:8000/api/exports/demo/latest" target="_blank">导出演示摘要</Button>
           </Space>
         </div>
       </section>

@@ -409,8 +409,7 @@ body {
 .copilot-message-audit,
 .copilot-message-form,
 .copilot-message-workflow,
-.copilot-message-fillAssist,
-.copilot-message-fillReview {
+.copilot-message-fillAssist {
   border-left: 4px solid #0e7490;
 }
 

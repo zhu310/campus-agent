@@ -10,9 +10,9 @@ const { TextArea } = Input
 const { Title, Paragraph, Text } = Typography
 
 export default function ChatPage() {
-  const [question, setQuestion] = useState('我一个人可以参加这个比赛吗？报名截止时间是什么时候？')
+  const [question, setQuestion] = useState('')
   const [answer, setAnswer] = useState<AskResponse | null>(null)
-  const [materialText, setMaterialText] = useState('姓名：张三\n手机号：13800138000\n邮箱：demo@example.com\nQQ：12345678\n项目名称：校智办——高校事务智能办理Agent\n指导教师：李老师')
+  const [materialText, setMaterialText] = useState('')
   const [auditResult, setAuditResult] = useState<AuditResponse | null>(null)
   const [formResult, setFormResult] = useState<FormFillResponse | null>(null)
   const [documents, setDocuments] = useState<DocumentItem[]>([])

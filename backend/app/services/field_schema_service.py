@@ -24,8 +24,36 @@ FIELD_SCHEMAS: dict[str, dict[str, Any]] = {
         "field_priorities": ["name", "amount", "invoice", "invoice_type", "project_name", "phone"],
     },
     "scholarship": {
-        "required_fields": ["name", "student_id", "college_class", "student_level"],
-        "field_priorities": ["name", "student_id", "college_class", "school", "student_level", "phone", "email"],
+        "required_fields": [
+            "name", "gender", "birth_date", "ethnicity", "political_status",
+            "enrollment_date", "student_id", "grade", "id_number", "phone",
+            "college_class", "awards", "family_population", "family_income",
+            "income_source", "family_address", "postal_code", "grade_rank",
+            "application_reason",
+        ],
+        "field_priorities": [
+            "name", "gender", "birth_date", "ethnicity", "political_status",
+            "enrollment_date", "student_id", "grade", "id_number", "phone",
+            "college_class", "awards", "family_population", "family_income",
+            "per_capita_income", "income_source", "family_address", "postal_code",
+            "poverty_level", "grade_rank", "comprehensive_rank", "application_reason",
+        ],
+    },
+    "scholarship_application": {
+        "required_fields": [
+            "name", "gender", "birth_date", "ethnicity", "political_status",
+            "enrollment_date", "student_id", "grade", "id_number", "phone",
+            "college_class", "awards", "family_population", "family_income",
+            "income_source", "family_address", "postal_code", "grade_rank",
+            "application_reason",
+        ],
+        "field_priorities": [
+            "name", "gender", "birth_date", "ethnicity", "political_status",
+            "enrollment_date", "student_id", "grade", "id_number", "phone",
+            "college_class", "awards", "family_population", "family_income",
+            "per_capita_income", "income_source", "family_address", "postal_code",
+            "poverty_level", "grade_rank", "comprehensive_rank", "application_reason",
+        ],
     },
     "club_activity": {
         "required_fields": ["applicant", "activity_name", "activity_time", "activity_location", "phone"],

@@ -1,6 +1,6 @@
 """导出接口。
 
-把最近一次审核、表单预填和流程规划结果导出为纯文本，方便演示或归档。
+把最近一次审核、表单预填和流程规划结果导出为纯文本，方便归档。
 """
 
 from datetime import datetime
@@ -87,14 +87,14 @@ def export_latest_workflow(db: Session = Depends(get_db)):
     ])
 
 
-@router.get("/demo/latest", response_class=PlainTextResponse)
-def export_demo_summary(db: Session = Depends(get_db)):
+@router.get("/summary/latest", response_class=PlainTextResponse)
+def export_latest_summary(db: Session = Depends(get_db)):
     chat = db.query(ChatLog).order_by(ChatLog.created_at.desc()).first()
     audit = db.query(AuditResult).order_by(AuditResult.created_at.desc()).first()
     form = db.query(FormFillResult).order_by(FormFillResult.created_at.desc()).first()
     workflow = db.query(WorkflowRun).order_by(WorkflowRun.created_at.desc()).first()
     return "\n".join([
-        "# 智审通 Campus Copilot 演示摘要",
+        "# 智审通 Campus Copilot 办理摘要",
         f"导出时间：{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}",
         "",
         "## RAG 问答",

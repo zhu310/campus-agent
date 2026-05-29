@@ -26,6 +26,8 @@ export interface AskResponse {
 }
 
 export interface OCRResponse {
+  document_id?: number | null
+  chunks_indexed?: number
   filename: string
   engine: string
   text: string
@@ -66,8 +68,10 @@ export interface FormFillResponse {
   fields: Record<string, string>
   template_name: string
   missing_fields: string[]
+  quality?: Record<string, unknown>
   prefill_sources?: Record<string, unknown>
   review_fields?: string[]
+  quality_warnings?: string[]
   raw_fields?: Record<string, unknown>[]
   field_matches?: Record<string, unknown>[]
   unmapped_fields?: Record<string, unknown>[]
@@ -86,6 +90,7 @@ export interface WorkflowResponse {
   steps: WorkflowStep[]
   required_materials: string[]
   risk_reminders: string[]
+  fallback_used?: boolean
 }
 
 export interface NoticeEvidence {
@@ -126,15 +131,6 @@ export interface FillAssistantResponse {
   questions: string[]
   draft_sections: DraftSection[]
   risks: string[]
-  evidence: NoticeEvidence[]
-  fallback_used: boolean
-}
-
-export interface FillReviewResponse {
-  passed: boolean
-  conclusion: string
-  issues: string[]
-  suggestions: string[]
   evidence: NoticeEvidence[]
   fallback_used: boolean
 }
@@ -192,12 +188,6 @@ export interface RulePolicyItem {
   suggestion: string
 }
 
-export interface DemoAsset {
-  name: string
-  type: string
-  content: string
-}
-
 export interface CapabilityItem {
   name: string
   status: string
@@ -208,7 +198,7 @@ export interface CapabilityResponse {
   required: CapabilityItem[]
   recommended: CapabilityItem[]
   extensions: CapabilityItem[]
-  model_runtime: Record<string, string | boolean>
+  model_runtime: Record<string, unknown>
 }
 
 export interface TaskDetail {

@@ -21,16 +21,14 @@ def workflow_plan(req: WorkflowRequest, db: Session = Depends(get_db)):
     selected_docs = db.query(Document).filter(Document.id.in_(req.document_ids)).all() if req.document_ids else []
     if req.document_ids and not selected_docs:
         raise HTTPException(status_code=404, detail="未找到选中的制度/通知文件。")
-    doc_context = "；".join(doc.filename for doc in selected_docs)
-    request_text = req.request_text
-    if doc_context:
-        request_text = f"{request_text}\n选中文件：{doc_context}"
-    result = plan_workflow(request_text, req.scenario)
+    documents = [{"filename": doc.filename, "content": doc.content or "", "source_type": doc.source_type} for doc in selected_docs]
+    result = plan_workflow(req.request_text, req.scenario, documents=documents)
     db.add(WorkflowRun(intent=result["intent"], request_text=req.request_text, result=result))
     db.add(
         ToolLog(
             task_name="流程待办",
             tool_name="generate_todo_plan",
+            status="fallback" if result.get("fallback_used") else "completed",
             input_payload={"request_text": req.request_text, "scenario": req.scenario, "document_ids": req.document_ids},
             output_payload={"todos": result["todos"]},
         )

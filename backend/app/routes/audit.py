@@ -12,6 +12,7 @@ from sqlalchemy.orm import Session
 
 from app.db.session import get_db
 from app.models import AuditResult, AuditTask, Document, ToolLog
+from app.routes.documents import _index_document
 from app.schemas import AuditRequest, AuditResponse, ExtractFieldsRequest, ExtractFieldsResponse, OCRResponse
 from app.services.audit_service import audit_material, list_rules, merge_field_details, missing_field_labels
 from app.services.file_parser import extract_text_from_file
@@ -171,15 +172,24 @@ def audit_upload(
             "fallback_used": False,
         }
     visible_name = (display_name or "").strip() or file.filename or saved_name
-    db.add(
-        Document(
-            filename=visible_name,
-            content=parsed["text"],
-            source="upload",
-            source_type="material",
-            scenario=scenario,
-            file_path=str(file_path),
-        )
+    doc = Document(
+        filename=visible_name,
+        content=parsed["text"],
+        source="upload",
+        source_type="material",
+        scenario=scenario,
+        file_path=str(file_path),
+    )
+    db.add(doc)
+    db.commit()
+    db.refresh(doc)
+    chunks_indexed = _index_document(
+        doc.id,
+        doc.filename,
+        parsed["text"],
+        scenario=scenario,
+        source_type="material",
+        db=db,
     )
     db.add(
         ToolLog(
@@ -187,11 +197,13 @@ def audit_upload(
             tool_name="ocr_parse_file",
             status="fallback" if parsed["fallback_used"] else "completed",
             input_payload={"filename": visible_name, "original_filename": file.filename},
-            output_payload=redact_payload({"lines": len(parsed["lines"]), "fields": parsed["extracted_fields"]}),
+            output_payload=redact_payload({"document_id": doc.id, "chunks_indexed": chunks_indexed, "lines": len(parsed["lines"]), "fields": parsed["extracted_fields"]}),
         )
     )
     db.commit()
     return OCRResponse(
+        document_id=doc.id,
+        chunks_indexed=chunks_indexed,
         filename=visible_name,
         engine=parsed["engine"],
         text=parsed["text"],

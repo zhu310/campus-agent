@@ -3,19 +3,19 @@ import { useEffect, useRef, useState } from 'react'
 import type { MouseEvent } from 'react'
 import {
   Alert, Button, Card, Checkbox, Col, Descriptions, Divider, Empty, Input, List,
-  message, Radio, Row, Space, Tabs, Tag, Timeline,
+  message, Modal, Radio, Row, Space, Tabs, Tag, Timeline,
   Typography, Upload,
 } from 'antd'
 import {
-  CheckCircleOutlined, DeleteOutlined, FileSearchOutlined,
+  DeleteOutlined, FileSearchOutlined,
   FormOutlined, InboxOutlined, OrderedListOutlined, SearchOutlined,
 } from '@ant-design/icons'
 import dayjs from 'dayjs'
 import type { UploadRequestOption } from 'rc-upload/lib/interface'
 import api from '../api'
 import {
-  AskResponse, AuditResponse, DemoAsset, DocumentDetail, DocumentItem,
-  FillAssistantResponse, FillReviewResponse, FormFillResponse,
+  AskResponse, AuditResponse, DocumentDetail, DocumentItem,
+  FillAssistantResponse, FormFillResponse,
   NoticeTaskResponse, OCRResponse, SessionDetail, SessionItem, SummaryResponse, WorkflowResponse,
 } from '../types'
 
@@ -36,35 +36,30 @@ function normalizeScenarioName(value: string) {
   return value === '其他场景' ? '自定义场景' : value
 }
 
-const SCENARIO_PRESETS: Record<string, { question: string; quickQuestions: string[]; material: string; uploadMode: UploadMode }> = {
+const SCENARIO_PRESETS: Record<string, { question: string; quickQuestions: string[]; uploadMode: UploadMode }> = {
   比赛报名: {
     question: '参赛对象是谁？',
     quickQuestions: ['单人能否参赛？', '报名截止时间是什么？', '作品提交到哪里？', '参赛对象是谁？'],
-    material: '姓名：张三\n学号：2023001001\n学院/班级：计算机学院 软件工程 2023级1班\n联系方式：13800138000\n项目名称：智审通 Campus Copilot\n队伍人数：4\n指导教师：李老师\n邮箱：demo@example.com\n团队成员：张三、李四、王五、赵六',
     uploadMode: 'knowledge_base',
   },
   请假审批: {
     question: '请假需要提交哪些证明材料？',
     quickQuestions: ['请假需要提交哪些证明材料？', '病假和事假流程有什么区别？', '请假单需要哪些字段？', '审批下一步怎么做？'],
-    material: '姓名：李明\n学号：2023002002\n学院/班级：计算机学院 2023级2班\n联系方式：13900139000\n请假类型：病假\n请假时间：2026-05-10 至 2026-05-12\n请假原因：发热需就医\n证明材料：门诊病历照片',
     uploadMode: 'material',
   },
   奖助学金申请: {
     question: '奖助学金申请需要哪些材料？',
     quickQuestions: ['奖助学金申请需要哪些材料？', '成绩排名是否会影响资格？', '缺少困难认定表怎么办？', '申请表可以预填哪些字段？'],
-    material: '姓名：王同学\n学号：2023003003\n学院/班级：计算机学院 2023级3班\n联系方式：13700137000\n申请类型：助学金\n成绩排名：20%\n困难认定：已通过',
     uploadMode: 'material',
   },
   报销办理: {
     question: '报销申请需要哪些票据？',
     quickQuestions: ['报销申请需要哪些票据？', '发票金额需要核验什么？', '缺少审批截图能否提交？', '报销流程下一步是什么？'],
-    material: '申请人：赵老师\n学院：计算机学院\n联系方式：13600136000\n报销事项：竞赛材料采购\n报销金额：1280.50\n附件：电子发票、支付截图、审批截图',
     uploadMode: 'material',
   },
   社团活动审批: {
     question: '社团活动审批需要哪些材料？',
     quickQuestions: ['社团活动审批需要哪些材料？', '活动安全预案是否必需？', '预计人数会影响审批吗？', '活动流程清单怎么生成？'],
-    material: '活动名称：AI 创新分享会\n主办单位：智能社团\n负责人：陈同学\n联系方式：13500135000\n活动时间：2026-05-18 14:00\n活动地点：教学楼报告厅\n预计人数：80\n附件：活动方案、安全预案、场地申请',
     uploadMode: 'material',
   },
 }
@@ -73,6 +68,13 @@ const FIELD_LABELS: Record<string, string> = {
   material_type: '材料类型',
   name: '姓名/负责人',
   student_id: '学号',
+  gender: '性别',
+  birth_date: '出生年月',
+  ethnicity: '民族',
+  political_status: '政治面貌',
+  enrollment_date: '入学时间',
+  grade: '所在年级',
+  id_number: '身份证号码',
   college_class: '学院/班级',
   school: '学校',
   student_level: '学生层次',
@@ -86,17 +88,28 @@ const FIELD_LABELS: Record<string, string> = {
   team_members: '团队成员',
   abstract: '摘要/内容',
   integrity_statement: '诚信承诺',
+  awards: '曾获何种奖励',
+  family_population: '家庭人口总数',
+  family_income: '家庭月总收入',
+  per_capita_income: '人均月收入',
+  income_source: '收入来源',
+  family_address: '家庭住址',
+  postal_code: '邮政编码',
+  poverty_level: '困难情况认定档次',
+  grade_rank: '成绩排名',
+  comprehensive_rank: '综合考评排名',
+  application_reason: '申请理由',
 }
 
 type UploadMode = 'knowledge_base' | 'material' | 'both'
-type CopilotMessageType = 'system' | 'user' | 'answer' | 'tasks' | 'fields' | 'audit' | 'form' | 'workflow' | 'fillAssist' | 'fillReview'
+type CopilotMessageType = 'system' | 'user' | 'answer' | 'tasks' | 'fields' | 'audit' | 'form' | 'workflow' | 'fillAssist'
 
 interface CopilotMessage {
   id: string
   type: CopilotMessageType
   title: string
   content?: string
-  payload?: AskResponse | NoticeTaskResponse | FillAssistantResponse | FillReviewResponse | AuditResponse | FormFillResponse | WorkflowResponse | Record<string, unknown>
+  payload?: AskResponse | NoticeTaskResponse | FillAssistantResponse | AuditResponse | FormFillResponse | WorkflowResponse | Record<string, unknown>
   createdAt: string
 }
 
@@ -109,9 +122,9 @@ function emptyAnswer(): AskResponse {
 }
 
 function sourceTypeLabel(value: string) {
-  if (value === 'knowledge_base') return '制度/通知'
-  if (value === 'material') return '办理材料'
-  if (value === 'both') return '双用途'
+  if (value === 'knowledge_base') return '规则/表单模板'
+  if (value === 'material') return '个人材料/填写草稿'
+  if (value === 'both') return '模板+材料'
   return value
 }
 
@@ -181,7 +194,6 @@ export default function WorkspacePage({ initialScenario = '比赛报名' }: Work
     const stored = window.localStorage.getItem('campus-active-session-id')
     return stored ? Number(stored) || null : null
   })
-  const [demoAssets, setDemoAssets] = useState<DemoAsset[]>([])
   const [scenario, setScenario] = useState(normalizeScenarioName(initialScenario))
   const [customScenario, setCustomScenario] = useState('')
   const [uploadMode, setUploadMode] = useState<UploadMode>('knowledge_base')
@@ -190,7 +202,7 @@ export default function WorkspacePage({ initialScenario = '比赛报名' }: Work
   const [selectedMaterialId, setSelectedMaterialId] = useState<number | null>(null)
   const [question, setQuestion] = useState(SCENARIO_PRESETS[initialScenario]?.question || SCENARIO_PRESETS['比赛报名'].question)
   const [quickQuestions, setQuickQuestions] = useState(SCENARIO_PRESETS[initialScenario]?.quickQuestions || SCENARIO_PRESETS['比赛报名'].quickQuestions)
-  const [materialText, setMaterialText] = useState(SCENARIO_PRESETS[initialScenario]?.material || SCENARIO_PRESETS['比赛报名'].material)
+  const [materialText, setMaterialText] = useState('')
   const [answer, setAnswer] = useState<AskResponse | null>(null)
   const [fieldResult, setFieldResult] = useState<Record<string, string>>({})
   const [ocrResult, setOcrResult] = useState<OCRResponse | null>(null)
@@ -199,11 +211,11 @@ export default function WorkspacePage({ initialScenario = '比赛报名' }: Work
   const [workflowResult, setWorkflowResult] = useState<WorkflowResponse | null>(null)
   const [noticeTaskResult, setNoticeTaskResult] = useState<NoticeTaskResponse | null>(null)
   const [fillAssistantResult, setFillAssistantResult] = useState<FillAssistantResponse | null>(null)
-  const [fillReviewResult, setFillReviewResult] = useState<FillReviewResponse | null>(null)
   const [copilotMessages, setCopilotMessages] = useState<CopilotMessage[]>([
-    makeMessage('system', 'Campus Copilot 已就绪', '选择左侧通知/制度文件后，可以直接提问，也可以点击快捷按钮生成完整办理流程、填写建议或审核草稿。'),
+    makeMessage('system', 'Campus Copilot 已就绪', '先上传规则、通知或表单模板，再选择个人材料或粘贴填写草稿，就可以问答、审核和生成表单草稿。'),
   ])
   const [previewDocument, setPreviewDocument] = useState<DocumentDetail | null>(null)
+  const [previewModalOpen, setPreviewModalOpen] = useState(false)
   const [activePanel, setActivePanel] = useState('preview')
   const [loadingAction, setLoadingAction] = useState<string | null>(null)
   const streamRef = useRef<HTMLDivElement | null>(null)
@@ -218,22 +230,25 @@ export default function WorkspacePage({ initialScenario = '比赛报名' }: Work
     setCopilotMessages((items) => [...items, messageItem])
   }
 
+  const stopControlEvent = (event?: MouseEvent<HTMLElement>) => {
+    event?.preventDefault()
+    event?.stopPropagation()
+  }
+
   useEffect(() => {
     streamRef.current?.scrollTo({ top: streamRef.current.scrollHeight, behavior: 'smooth' })
   }, [copilotMessages.length])
 
   const loadAll = async () => {
-    // 工作台启动时并行拉取摘要、文档和演示素材，减少首屏等待。
-    const [s, d, sessionRes, assets] = await Promise.all([
+    // 工作台启动时并行拉取摘要、文档和最近会话，减少首屏等待。
+    const [s, d, sessionRes] = await Promise.all([
       api.get<SummaryResponse>('/dashboard/summary'),
       api.get<DocumentItem[]>('/documents'),
       api.get<SessionItem[]>('/sessions/recent'),
-      api.get<DemoAsset[]>('/demo/assets'),
     ])
     setSummary(s.data)
     setDocuments(d.data)
     setSessions(sessionRes.data)
-    setDemoAssets(assets.data)
   }
 
   useEffect(() => {
@@ -283,7 +298,6 @@ export default function WorkspacePage({ initialScenario = '比赛报名' }: Work
     setAnswer(null)
     setNoticeTaskResult(null)
     setFillAssistantResult(null)
-    setFillReviewResult(null)
     setActivePanel('preview')
     window.localStorage.setItem('campus-active-session-id', String(res.data.id))
     message.success('已新建对话')
@@ -332,11 +346,7 @@ export default function WorkspacePage({ initialScenario = '比赛报名' }: Work
         }
         if (event.event_type === 'fill_assist') {
           const result = payload.result as FillAssistantResponse | undefined
-          if (result) restored.push(makeMessage('fillAssist', '历史填写助手', '已恢复填写建议。', result))
-        }
-        if (event.event_type === 'fill_review') {
-          const result = payload.result as FillReviewResponse | undefined
-          if (result) restored.push(makeMessage('fillReview', '历史填写审核', result.conclusion, result))
+          if (result) restored.push(makeMessage('fillAssist', '历史补全建议', '已恢复填写建议。', result))
         }
       } catch {
         restored.push(makeMessage('system', '历史记录恢复异常', `已跳过一条无法展示的历史记录：${event.title}`))
@@ -349,36 +359,43 @@ export default function WorkspacePage({ initialScenario = '比赛报名' }: Work
   }
 
   const renameSession = async (event: MouseEvent<HTMLElement>, item: SessionItem) => {
-    event.stopPropagation()
+    stopControlEvent(event)
     const nextName = window.prompt('请输入新的会话名称', item.name)
     if (!nextName?.trim() || nextName.trim() === item.name) return
-    const res = await api.patch<SessionItem>(`/sessions/${item.id}`, { name: nextName.trim() })
-    setSessions((items) => items.map((session) => session.id === item.id ? res.data : session))
-    message.success('会话已重命名')
-    await loadAll()
+    try {
+      const res = await api.patch<SessionItem>(`/sessions/${item.id}`, { name: nextName.trim() })
+      setSessions((items) => items.map((session) => session.id === item.id ? res.data : session))
+      message.success('会话已重命名')
+      await loadAll()
+    } catch (error: any) {
+      message.error(error?.response?.data?.detail || '会话重命名失败')
+    }
   }
 
   const deleteSession = async (event: MouseEvent<HTMLElement> | undefined, sessionId: number) => {
-    event?.stopPropagation()
+    stopControlEvent(event)
     if (!window.confirm('确认删除该会话？')) return
-    await api.delete(`/sessions/${sessionId}`)
-    setSessions((items) => items.filter((item) => item.id !== sessionId))
-    if (activeSessionId === sessionId) {
-      setActiveSessionId(null)
-      window.localStorage.removeItem('campus-active-session-id')
-      setCopilotMessages([makeMessage('system', '已删除当前会话', '可以新建对话，或从最近任务中恢复其他会话。')])
+    try {
+      await api.delete(`/sessions/${sessionId}`)
+      setSessions((items) => items.filter((item) => item.id !== sessionId))
+      if (activeSessionId === sessionId) {
+        setActiveSessionId(null)
+        window.localStorage.removeItem('campus-active-session-id')
+        setCopilotMessages([makeMessage('system', '已删除当前会话', '可以新建对话，或从最近任务中恢复其他会话。')])
+      }
+      message.success('会话已删除')
+      await loadAll()
+    } catch (error: any) {
+      message.error(error?.response?.data?.detail || '会话删除失败')
     }
-    message.success('会话已删除')
-    await loadAll()
   }
 
   const applyScenarioPreset = (nextScenario: string) => {
-    // 切换场景时同步替换问题、快捷问法、示例材料和上传用途。
+    // 切换场景时同步替换问题、快捷问法和上传用途。
     const preset = SCENARIO_PRESETS[nextScenario] || SCENARIO_PRESETS['比赛报名']
     setScenario(nextScenario)
     setQuestion(preset.question)
     setQuickQuestions(preset.quickQuestions)
-    setMaterialText(preset.material)
     setUploadMode(preset.uploadMode)
     setAnswer(null)
     setFieldResult({})
@@ -388,7 +405,6 @@ export default function WorkspacePage({ initialScenario = '比赛报名' }: Work
     setWorkflowResult(null)
     setNoticeTaskResult(null)
     setFillAssistantResult(null)
-    setFillReviewResult(null)
     setActivePanel('preview')
   }
 
@@ -415,7 +431,6 @@ export default function WorkspacePage({ initialScenario = '比赛报名' }: Work
       setWorkflowResult(null)
       setNoticeTaskResult(null)
       setFillAssistantResult(null)
-      setFillReviewResult(null)
     setActivePanel('preview')
   }
 
@@ -478,16 +493,25 @@ export default function WorkspacePage({ initialScenario = '比赛报名' }: Work
   }
 
   const previewDocumentFile = async (event: MouseEvent<HTMLElement>, id: number) => {
-    event.stopPropagation()
-    const res = await api.get<DocumentDetail>(`/documents/${id}`)
-    setPreviewDocument(res.data)
-    setActivePanel('preview')
+    stopControlEvent(event)
+    try {
+      const res = await api.get<DocumentDetail>(`/documents/${id}`)
+      setPreviewDocument(res.data)
+      setPreviewModalOpen(true)
+      setActivePanel('preview')
+    } catch (error: any) {
+      message.error(error?.response?.data?.detail || '文件查看失败')
+    }
   }
 
   const confirmDeleteDocument = async (event: MouseEvent<HTMLElement> | undefined, id: number) => {
-    event?.stopPropagation()
+    stopControlEvent(event)
     if (!window.confirm('确认删除该文件？')) return
-    await deleteDocument(id)
+    try {
+      await deleteDocument(id)
+    } catch (error: any) {
+      message.error(error?.response?.data?.detail || '文件删除失败')
+    }
   }
 
   const handleUpload = async (options: UploadRequestOption) => {
@@ -514,6 +538,11 @@ export default function WorkspacePage({ initialScenario = '比赛报名' }: Work
         setOcrResult(res.data)
         setMaterialText(res.data.text)
         setFieldResult(res.data.extracted_fields || {})
+        if (res.data.document_id) {
+          const detail = await api.get<DocumentDetail>(`/documents/${res.data.document_id}`)
+          setPreviewDocument(detail.data)
+          setSelectedMaterialId(res.data.document_id)
+        }
         setActivePanel('fields')
       } else {
         form.append('source_type', uploadMode)
@@ -543,21 +572,9 @@ export default function WorkspacePage({ initialScenario = '比赛报名' }: Work
     }
   }
 
-  const importDemoNotice = async () => {
-    setLoadingAction('demo')
-    try {
-      const res = await api.post('/demo/load-contest-notice')
-      setSelectedKnowledgeIds((ids) => Array.from(new Set([...ids, res.data.document_id])))
-      message.success('示例比赛通知已导入')
-      await loadAll()
-    } finally {
-      setLoadingAction(null)
-    }
-  }
-
   const askQuestion = async (clearInputOnSuccess = true) => {
     if (!selectedKnowledgeIds.length) {
-      message.warning('请先在左侧勾选用于问答的制度/通知文件')
+      message.warning('请先在左侧勾选用于问答的规则/表单模板')
       return emptyAnswer()
     }
     const currentQuestion = question.trim()
@@ -592,7 +609,7 @@ export default function WorkspacePage({ initialScenario = '比赛报名' }: Work
 
   const askPresetQuestion = async (presetQuestion: string) => {
     if (!selectedKnowledgeIds.length) {
-      message.warning('请先在左侧勾选用于问答的制度/通知文件')
+      message.warning('请先在左侧勾选用于问答的规则/表单模板')
       return emptyAnswer()
     }
     setQuestion(presetQuestion)
@@ -634,7 +651,7 @@ export default function WorkspacePage({ initialScenario = '比赛报名' }: Work
       })
       setFieldResult(res.data.fields || {})
       setActivePanel('fields')
-      pushMessage(makeMessage('fields', '信息抽取', '已从当前办理材料中抽取字段。', res.data))
+      pushMessage(makeMessage('fields', '信息抽取', '已从当前材料文本中抽取字段。', res.data))
       await loadAll()
       return res.data.fields || {}
     } finally {
@@ -642,9 +659,9 @@ export default function WorkspacePage({ initialScenario = '比赛报名' }: Work
     }
   }
 
-  const auditMaterial = async () => {
+  const auditMaterial = async (options: { keepLoading?: boolean; quiet?: boolean } = {}) => {
     // 审核前确保已有结构化字段；如果用户没手动提取，就先自动提取一次。
-    setLoadingAction('audit')
+    if (!options.keepLoading) setLoadingAction('audit')
     try {
       const fields = Object.keys(fieldResult).length ? fieldResult : await identifyFields()
       const res = await api.post<AuditResponse>('/audit/run', {
@@ -659,11 +676,11 @@ export default function WorkspacePage({ initialScenario = '比赛报名' }: Work
       setAuditResult(res.data)
       setFieldResult(res.data.recognized_fields || fields)
       setActivePanel('audit')
-      pushMessage(makeMessage('audit', '材料审核', res.data.conclusion, res.data))
+      if (!options.quiet) pushMessage(makeMessage('audit', '当前内容审核', res.data.conclusion, res.data))
       await loadAll()
       return res.data
     } finally {
-      setLoadingAction(null)
+      if (!options.keepLoading) setLoadingAction(null)
     }
   }
 
@@ -690,7 +707,7 @@ export default function WorkspacePage({ initialScenario = '比赛报名' }: Work
 
   const generateWorkflow = async () => {
     if (!canPlanWorkflow) {
-      message.warning('请先选择制度/通知文件，或上传/粘贴一份办理材料')
+      message.warning('请先选择规则/表单模板，或上传/粘贴一份个人材料')
       return null
     }
     setLoadingAction('workflow')
@@ -740,8 +757,8 @@ export default function WorkspacePage({ initialScenario = '比赛报名' }: Work
     }
   }
 
-  const generateFillAssistant = async () => {
-    setLoadingAction('fillAssist')
+  const generateFillAssistant = async (options: { keepLoading?: boolean; quiet?: boolean } = {}) => {
+    if (!options.keepLoading) setLoadingAction('fillAssist')
     try {
       const sessionId = await ensureActiveSession()
       const res = await api.post<FillAssistantResponse>('/forms/assist', {
@@ -753,34 +770,24 @@ export default function WorkspacePage({ initialScenario = '比赛报名' }: Work
         session_id: sessionId,
       })
       setFillAssistantResult(res.data)
-      pushMessage(makeMessage('fillAssist', '填写助手', '已根据选中文件和你提供的信息生成追问与草稿建议。', res.data))
+      if (!options.quiet) pushMessage(makeMessage('fillAssist', '补全填写建议', '已根据选中文件和你提供的信息生成追问与草稿建议。', res.data))
       await loadAll()
       return res.data
     } finally {
-      setLoadingAction(null)
+      if (!options.keepLoading) setLoadingAction(null)
     }
   }
 
-  const reviewDraft = async () => {
-    setLoadingAction('fillReview')
+  const auditAndAssist = async () => {
+    setLoadingAction('auditAssist')
     try {
-      const sessionId = await ensureActiveSession()
-      const draft = fillAssistantResult?.draft_sections.map((item) => `${item.field_name}：\n${item.draft}`).join('\n\n') || materialText
-      const reviewDocumentIds = Array.from(new Set([
-        ...selectedKnowledgeIds,
-        ...(selectedMaterialId ? [selectedMaterialId] : []),
-      ]))
-      const res = await api.post<FillReviewResponse>('/forms/review-draft', {
-        document_ids: reviewDocumentIds,
-        user_profile: materialText,
-        draft_content: draft,
-        scenario: scenarioCode,
-        session_id: sessionId,
-      })
-      setFillReviewResult(res.data)
-      pushMessage(makeMessage('fillReview', '填写内容审核', res.data.conclusion, res.data))
+      const audit = await auditMaterial({ keepLoading: true, quiet: true })
+      const assist = await generateFillAssistant({ keepLoading: true, quiet: true })
+      pushMessage(makeMessage('audit', '审核并补全', audit?.conclusion || '已完成当前内容审核。', audit || {}))
+      pushMessage(makeMessage('fillAssist', '补全填写建议', '已根据审核结果生成追问与草稿建议。', assist || {}))
+      setActivePanel('audit')
       await loadAll()
-      return res.data
+      return { audit, assist }
     } finally {
       setLoadingAction(null)
     }
@@ -792,7 +799,7 @@ export default function WorkspacePage({ initialScenario = '比赛报名' }: Work
     try {
       if (selectedKnowledgeIds.length) await askQuestion(false)
       await identifyFields()
-      await auditMaterial()
+      await auditAndAssist()
       await prefillForm()
       await generateWorkflow()
       setActivePanel('workflow')
@@ -839,7 +846,7 @@ export default function WorkspacePage({ initialScenario = '比赛报名' }: Work
       label: '信息抽取',
       children: Object.keys(fieldResult).length ? (
         <Space direction="vertical" size={12} style={{ width: '100%' }}>
-          <Alert type="info" showIcon message="这里展示从当前办理材料中抽取出的字段，用于后续审核和表单预填。" />
+          <Alert type="info" showIcon message="这里展示从当前材料文本中抽取出的字段，用于后续审核和表单草稿生成。" />
           <Descriptions size="small" column={1} bordered>
             {orderedFieldEntries(fieldResult).map(([key, value]) => (
               <Descriptions.Item key={key} label={FIELD_LABELS[key] || key}>{displayValue(value)}</Descriptions.Item>
@@ -868,11 +875,11 @@ export default function WorkspacePage({ initialScenario = '比赛报名' }: Work
           <List size="small" header="仍需确认" dataSource={noticeTaskResult.missing_information} locale={{ emptyText: '暂无需确认项' }} renderItem={(item) => <List.Item>{item}</List.Item>} />
           <List size="small" header="跨文件风险" dataSource={noticeTaskResult.cross_document_risks} locale={{ emptyText: '暂无跨文件风险' }} renderItem={(item) => <List.Item>{item}</List.Item>} />
         </Space>
-      ) : <Empty description="点击“生成办理流程”后，这里会把通知拆成完整可执行步骤" image={Empty.PRESENTED_IMAGE_SIMPLE} />,
+      ) : <Empty description="点击“生成办理清单”后，这里会把规则或通知拆成完整可执行步骤" image={Empty.PRESENTED_IMAGE_SIMPLE} />,
     },
     {
       key: 'fillAssist',
-      label: '填写助手',
+      label: '补全建议',
       children: fillAssistantResult ? (
         <Space direction="vertical" size={12} style={{ width: '100%' }}>
           <Alert type={fillAssistantResult.fallback_used ? 'warning' : 'info'} showIcon message="系统先判断需要补充的信息，再生成可复制草稿。" />
@@ -889,19 +896,7 @@ export default function WorkspacePage({ initialScenario = '比赛报名' }: Work
           )} />
           <List size="small" header="风险提醒" dataSource={fillAssistantResult.risks} locale={{ emptyText: '暂无风险' }} renderItem={(item) => <List.Item>{item}</List.Item>} />
         </Space>
-      ) : <Empty description="点击“填写助手”后，这里会显示缺失信息、追问和可复制草稿" image={Empty.PRESENTED_IMAGE_SIMPLE} />,
-    },
-    {
-      key: 'fillReview',
-      label: '填写审核',
-      children: fillReviewResult ? (
-        <Space direction="vertical" size={12} style={{ width: '100%' }}>
-          <Alert type={fillReviewResult.passed ? 'success' : 'warning'} showIcon message={fillReviewResult.conclusion} />
-          <List size="small" header="问题" dataSource={fillReviewResult.issues} locale={{ emptyText: '暂无问题' }} renderItem={(item) => <List.Item>{item}</List.Item>} />
-          <List size="small" header="修改建议" dataSource={fillReviewResult.suggestions} locale={{ emptyText: '暂无建议' }} renderItem={(item) => <List.Item>{item}</List.Item>} />
-          <List size="small" header="审核依据" dataSource={fillReviewResult.evidence} locale={{ emptyText: '暂无依据' }} renderItem={(ev) => <List.Item><div><Text strong>{ev.filename}</Text><Paragraph className="citation-text">{ev.text}</Paragraph></div></List.Item>} />
-        </Space>
-      ) : <Empty description="点击“审核填写内容”后，这里会检查草稿是否符合通知和个人信息" image={Empty.PRESENTED_IMAGE_SIMPLE} />,
+      ) : <Empty description="点击“审核并补全”后，这里会显示缺失信息、追问和可复制草稿" image={Empty.PRESENTED_IMAGE_SIMPLE} />,
     },
     {
       key: 'audit',
@@ -918,30 +913,39 @@ export default function WorkspacePage({ initialScenario = '比赛报名' }: Work
             <List.Item><div><Text strong>{item.rule_name}</Text><div><Text type="secondary">{item.result} / {item.suggestion}</Text></div></div></List.Item>
           )} />
         </Space>
-      ) : <Empty description="点击“审核材料”后，这里展示基于当前材料字段的审核结果" image={Empty.PRESENTED_IMAGE_SIMPLE} />,
+      ) : <Empty description="点击“审核并补全”后，这里展示基于当前材料文本的审核结果" image={Empty.PRESENTED_IMAGE_SIMPLE} />,
     },
     {
       key: 'form',
-      label: '表单',
+      label: '表单草稿',
       children: formResult ? (
         <Space direction="vertical" size={12} style={{ width: '100%' }}>
+          {formResult.quality_warnings?.map((item) => <Alert key={item} type="warning" showIcon message={item} />)}
+          {formResult.quality ? (
+            <Space wrap>
+              <Tag>字段 {String(formResult.quality.field_count ?? 0)}</Tag>
+              <Tag color="green">已填 {String(formResult.quality.filled_count ?? 0)}</Tag>
+              <Tag color="orange">待补 {String(formResult.quality.missing_count ?? 0)}</Tag>
+              {formResult.quality.needs_human_review ? <Tag color="red">建议复核</Tag> : <Tag color="blue">可信度较高</Tag>}
+            </Space>
+          ) : null}
           <Descriptions size="small" column={1} bordered>
             {Object.entries(formResult.fields).map(([key, value]) => <Descriptions.Item key={key} label={key}>{displayValue(value)}</Descriptions.Item>)}
           </Descriptions>
           <List size="small" header="仍需补充字段" dataSource={formResult.missing_fields} locale={{ emptyText: '表单字段已较完整' }} renderItem={(item) => <List.Item>{item}</List.Item>} />
         </Space>
-      ) : <Empty description="点击“预填表单”后，这里展示可写入表单的结构化结果" image={Empty.PRESENTED_IMAGE_SIMPLE} />,
+      ) : <Empty description="点击“生成表单草稿”后，这里展示可写入表单的结构化结果" image={Empty.PRESENTED_IMAGE_SIMPLE} />,
     },
     {
       key: 'workflow',
       label: '下一步',
       children: workflowResult ? (
         <Space direction="vertical" size={12} style={{ width: '100%' }}>
-          <Alert type="success" showIcon message={workflowResult.summary} />
+          <Alert type={workflowResult.fallback_used ? 'warning' : 'success'} showIcon message={workflowResult.summary} />
           <Timeline items={workflowResult.steps.map((item) => ({ children: <div><Text strong>{item.title}</Text><div>{item.detail}</div>{item.deadline ? <Tag color="gold">{item.deadline}</Tag> : null}</div> }))} />
           <List size="small" header="风险提醒" dataSource={workflowResult.risk_reminders} locale={{ emptyText: '暂无风险提醒' }} renderItem={(item) => <List.Item>{item}</List.Item>} />
         </Space>
-      ) : <Empty description="点击“生成下一步”后，这里会按当前材料和选中文件生成计划" image={Empty.PRESENTED_IMAGE_SIMPLE} />,
+      ) : <Empty description="完整闭环执行后，这里会按当前材料和选中文件生成下一步建议" image={Empty.PRESENTED_IMAGE_SIMPLE} />,
     },
   ]
 
@@ -980,16 +984,6 @@ export default function WorkspacePage({ initialScenario = '比赛报名' }: Work
               </div>
             </List.Item>
           )} />
-        </Space>
-      )
-    }
-    if (item.type === 'fillReview') {
-      const data = item.payload as FillReviewResponse
-      return (
-        <Space direction="vertical" size={10} style={{ width: '100%' }}>
-          <Alert type={data.passed ? 'success' : 'warning'} showIcon message={data.conclusion} />
-          <List size="small" header="问题" dataSource={data.issues} locale={{ emptyText: '暂无问题' }} renderItem={(value) => <List.Item>{value}</List.Item>} />
-          <List size="small" header="建议" dataSource={data.suggestions} locale={{ emptyText: '暂无建议' }} renderItem={(value) => <List.Item>{value}</List.Item>} />
         </Space>
       )
     }
@@ -1055,6 +1049,23 @@ export default function WorkspacePage({ initialScenario = '比赛报名' }: Work
 
   return (
     <div className="workspace-page-shell">
+      <Modal
+        title={previewDocument?.filename || '文件内容'}
+        open={previewModalOpen}
+        width={900}
+        footer={null}
+        onCancel={() => setPreviewModalOpen(false)}
+      >
+        {previewDocument ? (
+          <Space direction="vertical" size={12} style={{ width: '100%' }}>
+            <Space wrap>
+              <Tag>{sourceTypeLabel(previewDocument.source_type)}</Tag>
+              <Tag>{previewDocument.scenario}</Tag>
+            </Space>
+            <pre className="document-preview">{previewDocument.content || '暂无可预览文本。若原文件是图片或扫描件，说明 OCR/解析未提取到可用文字。'}</pre>
+          </Space>
+        ) : null}
+      </Modal>
       <section className="compact-hero">
         <div>
           <Space wrap align="center">
@@ -1071,26 +1082,24 @@ export default function WorkspacePage({ initialScenario = '比赛报名' }: Work
           <Card title="文件中心" className="workspace-card fixed-panel file-center-panel" bordered={false}>
             <div className="panel-scroll">
               <Radio.Group value={uploadMode} onChange={(event) => setUploadMode(event.target.value)} optionType="button" buttonStyle="solid" className="upload-mode">
-                <Radio.Button value="knowledge_base">制度/通知</Radio.Button>
-                <Radio.Button value="material">办理材料</Radio.Button>
-                <Radio.Button value="both">双用途</Radio.Button>
+                <Radio.Button value="knowledge_base">规则/模板</Radio.Button>
+                <Radio.Button value="material">个人材料</Radio.Button>
+                <Radio.Button value="both">两者都是</Radio.Button>
               </Radio.Group>
               <Input
                 value={uploadDisplayName}
                 onChange={(event) => setUploadDisplayName(event.target.value)}
-                placeholder="文件显示名称，如：2026 智能体比赛通知"
+                placeholder="文件显示名称，如：奖学金申请表模板"
                 style={{ marginBottom: 10 }}
               />
               <Upload.Dragger className="compact-uploader" customRequest={handleUpload} showUploadList={false} accept=".png,.jpg,.jpeg,.bmp,.webp,.pdf,.docx,.txt,.md,.doc">
                 <p className="ant-upload-drag-icon"><InboxOutlined /></p>
                 <p className="ant-upload-text">上传{sourceTypeLabel(uploadMode)}</p>
-                <p className="ant-upload-hint">上传后在下方勾选或查看</p>
+                <p className="ant-upload-hint">表格模板和填表说明放到规则/模板；个人信息、证明材料和草稿放到个人材料</p>
               </Upload.Dragger>
-              <Button block style={{ marginTop: 10 }} loading={loadingAction === 'demo'} onClick={importDemoNotice}>导入示例通知</Button>
-
               <Divider />
               <Space align="center" style={{ justifyContent: 'space-between', width: '100%' }}>
-                <Title level={5} style={{ marginBottom: 0 }}>制度/通知</Title>
+                <Title level={5} style={{ marginBottom: 0 }}>规则/表单模板</Title>
                 <Button size="small" type="text" disabled={!selectedKnowledgeIds.length} onClick={clearSelectedKnowledge}>清空</Button>
               </Space>
               <Checkbox.Group
@@ -1102,12 +1111,12 @@ export default function WorkspacePage({ initialScenario = '比赛报名' }: Work
                 }}
                 style={{ width: '100%' }}
               >
-                <List size="small" dataSource={knowledgeDocs} locale={{ emptyText: <Empty description="暂无制度/通知文件" image={Empty.PRESENTED_IMAGE_SIMPLE} /> }} renderItem={(item) => (
+                <List size="small" dataSource={knowledgeDocs} locale={{ emptyText: <Empty description="暂无规则、通知或表单模板" image={Empty.PRESENTED_IMAGE_SIMPLE} /> }} renderItem={(item) => (
                   <List.Item className="file-management-row">
                     <Checkbox value={item.id} className="file-row-main"><Text>{item.filename}</Text></Checkbox>
-                    <Space size={4} onMouseDown={(event) => event.stopPropagation()} onClick={(event) => event.stopPropagation()}>
-                      <Button size="small" type="text" onMouseDown={(event) => event.stopPropagation()} onClick={(event) => previewDocumentFile(event, item.id)}>查看</Button>
-                      <Button danger size="small" type="text" icon={<DeleteOutlined />} onMouseDown={(event) => event.stopPropagation()} onClick={(event) => confirmDeleteDocument(event, item.id)} />
+                    <Space size={4} onMouseDown={stopControlEvent} onClick={stopControlEvent}>
+                      <Button size="small" type="text" onMouseDown={stopControlEvent} onClick={(event) => previewDocumentFile(event, item.id)}>查看</Button>
+                      <Button danger size="small" type="text" icon={<DeleteOutlined />} onMouseDown={stopControlEvent} onClick={(event) => confirmDeleteDocument(event, item.id)} />
                     </Space>
                   </List.Item>
                 )} />
@@ -1115,10 +1124,10 @@ export default function WorkspacePage({ initialScenario = '比赛报名' }: Work
 
               <Divider />
               <Space align="center" style={{ justifyContent: 'space-between', width: '100%' }}>
-                <Title level={5} style={{ marginBottom: 0 }}>办理材料</Title>
+                <Title level={5} style={{ marginBottom: 0 }}>个人材料/填写草稿</Title>
                 <Button size="small" type="text" disabled={!selectedMaterialId} onClick={clearSelectedMaterial}>清空</Button>
               </Space>
-              <List size="small" dataSource={materialDocs} locale={{ emptyText: <Empty description="暂无办理材料" image={Empty.PRESENTED_IMAGE_SIMPLE} /> }} renderItem={(item) => (
+              <List size="small" dataSource={materialDocs} locale={{ emptyText: <Empty description="暂无个人材料或填写草稿" image={Empty.PRESENTED_IMAGE_SIMPLE} /> }} renderItem={(item) => (
                 <List.Item className={`${selectedMaterialId === item.id ? 'selected-file-row' : 'file-row'} file-management-row`}>
                   <Checkbox checked={selectedMaterialId === item.id} className="file-row-main" onChange={() => loadMaterial(item.id)}>
                     <Space direction="vertical" size={2}>
@@ -1126,9 +1135,9 @@ export default function WorkspacePage({ initialScenario = '比赛报名' }: Work
                       <Text type="secondary">{dayjs(item.created_at).format('MM-DD HH:mm')}</Text>
                     </Space>
                   </Checkbox>
-                  <Space size={4} onMouseDown={(event) => event.stopPropagation()} onClick={(event) => event.stopPropagation()}>
-                    <Button size="small" type="text" onMouseDown={(event) => event.stopPropagation()} onClick={(event) => previewDocumentFile(event, item.id)}>查看</Button>
-                    <Button danger size="small" type="text" icon={<DeleteOutlined />} onMouseDown={(event) => event.stopPropagation()} onClick={(event) => confirmDeleteDocument(event, item.id)} />
+                  <Space size={4} onMouseDown={stopControlEvent} onClick={stopControlEvent}>
+                    <Button size="small" type="text" onMouseDown={stopControlEvent} onClick={(event) => previewDocumentFile(event, item.id)}>查看</Button>
+                    <Button danger size="small" type="text" icon={<DeleteOutlined />} onMouseDown={stopControlEvent} onClick={(event) => confirmDeleteDocument(event, item.id)} />
                   </Space>
                 </List.Item>
               )} />
@@ -1144,9 +1153,9 @@ export default function WorkspacePage({ initialScenario = '比赛报名' }: Work
                     <Space><Tag color={activeSessionId === item.id ? 'blue' : 'default'}>{index + 1}</Tag><Text strong>{item.name}</Text></Space>
                     <div><Text type="secondary">{item.summary || '暂无摘要'}</Text></div>
                   </div>
-                  <Space size={4} onMouseDown={(event) => event.stopPropagation()} onClick={(event) => event.stopPropagation()}>
-                    <Button size="small" type="text" onMouseDown={(event) => event.stopPropagation()} onClick={(event) => renameSession(event, item)}>重命名</Button>
-                    <Button danger size="small" type="text" icon={<DeleteOutlined />} onMouseDown={(event) => event.stopPropagation()} onClick={(event) => deleteSession(event, item.id)} />
+                  <Space size={4} onMouseDown={stopControlEvent} onClick={stopControlEvent}>
+                    <Button size="small" type="text" onMouseDown={stopControlEvent} onClick={(event) => renameSession(event, item)}>重命名</Button>
+                    <Button danger size="small" type="text" icon={<DeleteOutlined />} onMouseDown={stopControlEvent} onClick={(event) => deleteSession(event, item.id)} />
                   </Space>
                 </List.Item>
               )} />
@@ -1158,7 +1167,7 @@ export default function WorkspacePage({ initialScenario = '比赛报名' }: Work
           <Card title="Copilot 对话工作区" className="workspace-card fixed-panel" bordered={false}>
             <div className="copilot-shell">
               <div className="copilot-context">
-                <Alert type="info" showIcon message={`当前上下文：制度/通知 ${selectedKnowledgeIds.length} 份，办理材料 ${selectedMaterialId ? '1 份' : '未选择'}`} />
+                <Alert type="info" showIcon message={`当前上下文：规则/模板 ${selectedKnowledgeIds.length} 份，个人材料 ${selectedMaterialId ? '1 份' : '未选择'}`} />
                 <Space wrap>
                   {SCENARIOS.map((item) => <Tag key={item} color={scenario === item ? 'blue' : 'default'} className="action-tag" onClick={() => applyScenarioPreset(item)}>{item}</Tag>)}
                   <Space.Compact>
@@ -1182,14 +1191,11 @@ export default function WorkspacePage({ initialScenario = '比赛报名' }: Work
                 <div className="copilot-side-panel">
                   <div className="copilot-toolbox">
                     <Button type="primary" icon={<SearchOutlined />} loading={loadingAction === 'ask'} onClick={() => askQuestion()}>发送问题</Button>
-                    <Button icon={<OrderedListOutlined />} loading={loadingAction === 'noticeTasks'} onClick={generateNoticeTasks}>生成办理流程</Button>
+                    <Button icon={<OrderedListOutlined />} loading={loadingAction === 'noticeTasks'} onClick={generateNoticeTasks}>生成办理清单</Button>
                     <Button icon={<FileSearchOutlined />} loading={loadingAction === 'ask'} onClick={() => askPresetQuestion('请总结选中文件的核心事项、截止时间和材料要求')}>总结通知</Button>
                     <Button loading={loadingAction === 'fields'} onClick={identifyFields}>提取材料信息</Button>
-                    <Button loading={loadingAction === 'audit'} onClick={auditMaterial}>审核材料</Button>
-                    <Button loading={loadingAction === 'form'} onClick={prefillForm}>预填表单</Button>
-                    <Button loading={loadingAction === 'workflow'} disabled={!canPlanWorkflow} onClick={generateWorkflow}>生成下一步</Button>
-                    <Button icon={<FormOutlined />} loading={loadingAction === 'fillAssist'} onClick={generateFillAssistant}>填写助手</Button>
-                    <Button icon={<CheckCircleOutlined />} loading={loadingAction === 'fillReview'} onClick={reviewDraft}>审核草稿</Button>
+                    <Button loading={loadingAction === 'auditAssist'} onClick={auditAndAssist}>审核并补全</Button>
+                    <Button loading={loadingAction === 'form'} onClick={prefillForm}>生成表单草稿</Button>
                   </div>
                   <div className="copilot-side-section">
                     <Text strong>用户输入问题</Text>
@@ -1197,18 +1203,13 @@ export default function WorkspacePage({ initialScenario = '比赛报名' }: Work
                   </div>
                   <div className="copilot-side-section material-section">
                     <Space align="center" style={{ justifyContent: 'space-between', width: '100%' }}>
-                      <Text strong>文件材料预览</Text>
-                      {previewDocument ? <Tag>{previewDocument.filename}</Tag> : null}
+                      <Text strong>当前材料文本</Text>
+                      {selectedMaterial ? <Tag>{selectedMaterial.filename}</Tag> : null}
                     </Space>
                     <TextArea
-                      value={previewDocument?.source_type === 'knowledge_base' ? previewDocument.content : materialText}
-                      readOnly={!!previewDocument && previewDocument.source_type === 'knowledge_base'}
-                      onChange={(event) => {
-                        if (!previewDocument || previewDocument.source_type !== 'knowledge_base') {
-                          setMaterialText(event.target.value)
-                        }
-                      }}
-                      placeholder="选择办理材料后自动填入，也可以粘贴个人信息、申请草稿或需要审核的内容"
+                      value={materialText}
+                      onChange={(event) => setMaterialText(event.target.value)}
+                      placeholder="选择个人材料后自动填入，也可以粘贴个人信息、申请草稿或需要审核的内容"
                     />
                   </div>
                 </div>

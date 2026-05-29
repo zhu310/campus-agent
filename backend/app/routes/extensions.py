@@ -1,6 +1,6 @@
 """扩展能力接口。
 
-提供本地模型运行状态、智能体图谱、训练数据导出和场景模板等高级演示能力。
+提供本地模型运行状态、智能体图谱、训练数据导出和场景模板等扩展能力。
 """
 
 import json
@@ -75,9 +75,9 @@ def export_faq_dataset():
 @router.get("/datasets/ocr-fields.jsonl", response_class=PlainTextResponse)
 def export_ocr_field_dataset():
     samples = [
-        {"text": "姓名：张三\n联系方式：13800138000\n项目名称：智审通\n队伍人数：4", "fields": {"name": "张三", "phone": "13800138000", "project_name": "智审通", "team_size": "4"}},
-        {"text": "作品标题 | Campus Copilot | 学院 | 计算机学院 | E-mail地址 | demo@example.com", "fields": {"project_name": "Campus Copilot", "college_class": "计算机学院", "email": "demo@example.com"}},
-        {"text": "报销金额：1280.50\n票据类型：电子发票\n申请人：赵老师", "fields": {"amount": "1280.50", "invoice_type": "电子发票", "name": "赵老师"}},
+        {"text": "姓名：某同学\n联系方式：13800000000\n项目名称：校园智能服务\n队伍人数：4", "fields": {"name": "某同学", "phone": "13800000000", "project_name": "校园智能服务", "team_size": "4"}},
+        {"text": "作品标题 | Campus Copilot | 学院 | 计算机学院 | E-mail地址 | user@example.edu.cn", "fields": {"project_name": "Campus Copilot", "college_class": "计算机学院", "email": "user@example.edu.cn"}},
+        {"text": "报销金额：1280.50\n票据类型：电子发票\n申请人：某老师", "fields": {"amount": "1280.50", "invoice_type": "电子发票", "name": "某老师"}},
     ]
     return "\n".join(json.dumps(item, ensure_ascii=False) for item in samples)
 
@@ -118,6 +118,18 @@ DEEPSEEK_LLM_MODEL=deepseek-chat
 QWEN_BASE_URL=http://127.0.0.1:8001/v1
 QWEN_API_KEY=local-key
 QWEN_LLM_MODEL=qwen2.5-7b-instruct
+QWEN_EMBEDDING_MODEL=nomic-embed-text
+
+# 推荐：LLM 和 Embedding 分开配置。DeepSeek 用于聊天，Embedding 用可用的 OpenAI-compatible 向量模型。
+# 方式一：独立 embedding 服务
+EMBEDDING_BASE_URL=https://your-embedding-service.example.com/v1
+EMBEDDING_API_KEY=your-embedding-key
+EMBEDDING_MODEL=BAAI/bge-m3
+
+# 方式二：复用自定义 OpenAI-compatible 服务
+OPENAI_BASE_URL=https://your-openai-compatible-service.example.com/v1
+OPENAI_API_KEY=your-key
+EMBEDDING_MODEL=text-embedding-3-small
 
 3. 重启后端服务。
 4. 打开“系统设置 -> 应用模型”，选择 DeepSeek API 或本地 Qwen。

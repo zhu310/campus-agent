@@ -21,6 +21,13 @@ FIELD_LABELS = {
     "material_type": "材料类型",
     "name": "负责人",
     "student_id": "学号",
+    "gender": "性别",
+    "birth_date": "出生年月",
+    "ethnicity": "民族",
+    "political_status": "政治面貌",
+    "enrollment_date": "入学时间",
+    "grade": "所在年级",
+    "id_number": "身份证号码",
     "college_class": "学院/班级",
     "school": "学校",
     "student_level": "学生层次",
@@ -45,6 +52,17 @@ FIELD_LABELS = {
     "activity_time": "活动时间",
     "activity_location": "活动地点",
     "applicant": "申请人",
+    "awards": "曾获何种奖励",
+    "family_population": "家庭人口总数",
+    "family_income": "家庭月总收入",
+    "per_capita_income": "人均月收入",
+    "income_source": "收入来源",
+    "family_address": "家庭住址",
+    "postal_code": "邮政编码",
+    "poverty_level": "困难情况认定档次",
+    "grade_rank": "成绩排名",
+    "comprehensive_rank": "综合考评排名",
+    "application_reason": "申请理由",
 }
 
 DEFAULT_REQUIRED_FIELDS = ["name", "phone", "email", "project_name", "team_size"]
@@ -85,6 +103,13 @@ SEMANTIC_FIELD_GROUPS: dict[str, dict[str, Any]] = {
         "name": "学号",
         "aliases": ["学号", "学生编号"],
     },
+    "gender": _field_group("性别", ["性别"]),
+    "birth_date": _field_group("出生年月", ["出生年月", "出生日期", "生日"]),
+    "ethnicity": _field_group("民族", ["民族"]),
+    "political_status": _field_group("政治面貌", ["政治面貌"]),
+    "enrollment_date": _field_group("入学时间", ["入学时间", "入学日期"]),
+    "grade": _field_group("所在年级", ["所在年级", "年级"]),
+    "id_number": _field_group("身份证号码", ["身份证号码", "身份证号", "证件号码"]),
     "school": {
         "name": "学校",
         "aliases": ["学校", "所在学校", "高校"],
@@ -128,6 +153,17 @@ SEMANTIC_FIELD_GROUPS: dict[str, dict[str, Any]] = {
     "activity_time": _field_group("活动时间", ["活动时间", "举办时间", "开始日期", "结束日期"]),
     "activity_location": _field_group("活动地点", ["活动地点", "举办地点", "场地", "地点"]),
     "applicant": _field_group("申请人", ["申请人", "经办人", "提交人", "联系人", "负责人"]),
+    "awards": _field_group("曾获何种奖励", ["曾获何种奖励", "获奖情况", "奖励", "曾获奖励"]),
+    "family_population": _field_group("家庭人口总数", ["家庭人口总数", "家庭人口", "人口总数"]),
+    "family_income": _field_group("家庭月总收入", ["家庭月总收入", "家庭总收入", "月总收入"]),
+    "per_capita_income": _field_group("人均月收入", ["人均月收入", "人均收入"]),
+    "income_source": _field_group("收入来源", ["收入来源", "家庭收入来源"]),
+    "family_address": _field_group("家庭住址", ["家庭住址", "家庭地址", "住址"]),
+    "postal_code": _field_group("邮政编码", ["邮政编码", "邮编"]),
+    "poverty_level": _field_group("困难情况认定档次", ["困难情况认定档次", "困难认定档次", "困难档次"]),
+    "grade_rank": _field_group("成绩排名", ["成绩排名", "学习成绩排名", "排名"]),
+    "comprehensive_rank": _field_group("综合考评排名", ["综合考评排名", "综合排名", "实行综合考评排名"]),
+    "application_reason": _field_group("申请理由", ["申请理由", "申请原因", "申请说明"]),
 }
 
 FIELD_PATTERNS = {
@@ -395,8 +431,19 @@ def _match_raw_fields(raw_fields: list[dict[str, Any]], scenario: str = "competi
     unmapped: list[dict[str, Any]] = []
 
     for item in raw_fields:
-        field_name = _match_semantic_field(str(item.get("label", "")), scenario)
+        label_text = str(item.get("label", ""))
+        value_text = str(item.get("value", ""))
+        field_name = _match_semantic_field(label_text, scenario)
         if not field_name:
+            unmapped.append(item)
+            continue
+        if field_name in {"name", "applicant"} and "签名" in label_text:
+            unmapped.append(item)
+            continue
+        if field_name == "application_reason" and re.search(r"签名|公章|年\s*月\s*日", value_text):
+            unmapped.append(item)
+            continue
+        if field_name in {"school", "college_class"} and re.search(r"审核|意见|公章", label_text + value_text):
             unmapped.append(item)
             continue
         match = {

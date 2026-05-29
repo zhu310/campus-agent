@@ -14,7 +14,6 @@ from app.routes.agent import router as agent_router
 from app.routes.analytics import router as analytics_router
 from app.routes.chat import router as chat_router
 from app.routes.dashboard import router as dashboard_router
-from app.routes.demo import router as demo_router
 from app.routes.capabilities import router as capabilities_router
 from app.routes.documents import router as documents_router
 from app.routes.exports import router as exports_router
@@ -62,7 +61,6 @@ app.include_router(extensions_router, prefix="/api")
 app.include_router(history_router, prefix="/api")
 app.include_router(sessions_router, prefix="/api")
 app.include_router(tasks_router, prefix="/api")
-app.include_router(demo_router, prefix="/api")
 app.include_router(ocr_router, prefix="/api")
 app.include_router(review_router, prefix="/api")
 app.include_router(rules_router, prefix="/api")
