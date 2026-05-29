@@ -32,7 +32,7 @@ http://localhost:8000
 | GET | `/api/documents` | 获取文档列表 |
 | GET | `/api/documents/{document_id}` | 获取文档详情 |
 | DELETE | `/api/documents/{document_id}` | 删除文档 |
-| POST | `/api/documents/upload` | 上传 PDF、DOCX、TXT、图片等文件 |
+| POST | `/api/documents/upload` | 上传 PDF、DOCX、TXT、MD 文档 |
 | POST | `/api/documents/index-text` | 直接写入文本并建立索引 |
 | POST | `/api/knowledge/index` | 将文档内容写入知识库 |
 
@@ -74,8 +74,10 @@ http://localhost:8000
 
 | 方法 | 路径 | 说明 |
 |---|---|---|
+| POST | `/api/forms/assist` | 审核后生成补全追问、可复制草稿和风险建议 |
 | POST | `/api/forms/prefill` | 根据抽取字段生成表单草稿 |
-| POST | `/api/workflow/plan` | 生成下一步办理待办 |
+| POST | `/api/workflow/notice-tasks` | 从选中文件生成办理清单 |
+| POST | `/api/workflow/plan` | 基于选中文件和当前材料生成下一步办理计划 |
 
 ## 7. Agent 综合办理
 
@@ -121,5 +123,4 @@ http://localhost:8000
 | GET | `/api/exports/audit/latest` | 导出最近审核摘要 |
 | GET | `/api/exports/form/latest` | 导出最近表单摘要 |
 | GET | `/api/exports/workflow/latest` | 导出最近工作流摘要 |
-| GET | `/api/exports/demo/latest` | 导出演示摘要 |
-
+| GET | `/api/exports/summary/latest` | 导出最近办理摘要 |

@@ -15,15 +15,20 @@
    - 操作：注册登录 -> API keys -> 创建 key
    - `.env` 推荐：
      ```env
-     OPENAI_BASE_URL=https://api.deepseek.com/v1
-     LLM_MODEL=deepseek-chat
+     MODEL_PROVIDER=deepseek
+     DEEPSEEK_BASE_URL=https://api.deepseek.com/v1
+     DEEPSEEK_API_KEY=your-deepseek-key
+     DEEPSEEK_LLM_MODEL=deepseek-chat
+     EMBEDDING_BASE_URL=http://127.0.0.1:11434/v1
+     EMBEDDING_API_KEY=ollama
+     EMBEDDING_MODEL=bge-m3
      DEMO_MODE=false
      ```
 
 2. 阿里云百炼
    - 网站：https://bailian.console.aliyun.com/
    - 操作：开通模型服务 -> 获取 API Key -> 选择 Qwen 模型
-   - 注意：如果使用 OpenAI-compatible 地址，把 `OPENAI_BASE_URL` 改为百炼兼容地址。
+   - 注意：如果使用其他 OpenAI-compatible 平台，可走 `MODEL_PROVIDER=custom`，并配置 `OPENAI_BASE_URL`、`OPENAI_API_KEY`、`LLM_MODEL`。
 
 3. 火山引擎方舟
    - 网站：https://console.volcengine.com/ark/
@@ -66,9 +71,13 @@ base_url 是你配置的平台地址
 4. 如果使用 OpenAI-compatible 转接，请确保本地服务暴露 `/v1` 接口。
 5. `.env` 示例：
    ```env
-   OPENAI_BASE_URL=http://127.0.0.1:11434/v1
-   OPENAI_API_KEY=local-key
-   LLM_MODEL=qwen2.5:7b-instruct
+   MODEL_PROVIDER=qwen_local
+   QWEN_BASE_URL=http://127.0.0.1:11434/v1
+   QWEN_API_KEY=ollama
+   QWEN_LLM_MODEL=qwen2.5:7b-instruct
+   EMBEDDING_BASE_URL=http://127.0.0.1:11434/v1
+   EMBEDDING_API_KEY=ollama
+   EMBEDDING_MODEL=bge-m3
    DEMO_MODE=false
    ```
 
@@ -190,11 +199,11 @@ Ctrl + F5
 
 点击：进入智能办理。
 
-### 第二步：上传制度/通知
+### 第二步：上传规则/表单模板
 
 左侧文件中心：
 
-1. 上传类型选“制度/通知”。
+1. 上传类型选“规则/模板”。
 2. 上传比赛通知 PDF。
 3. 勾选该文件。
 4. 点击查看，展示可预览内容。
@@ -230,7 +239,7 @@ Ctrl + F5
 
 ### 第四步：上传报名材料
 
-左侧上传类型选“办理材料”，上传 DOCX 或图片。
+左侧上传类型选“个人材料”，上传 DOCX、PDF、图片或粘贴填写草稿。
 
 点击：
 
@@ -250,36 +259,36 @@ Ctrl + F5
 
 如果 OCR 图片效果不稳，使用 DOCX 或粘贴文本，不要硬等。
 
-### 第五步：审核材料
+### 第五步：审核并补全
 
 点击：
 
 ```text
-审核材料
+审核并补全
 ```
 
 讲法：
 
-> 系统会根据当前场景规则检查必填项、人数范围和材料完整性，输出通过、待补充或退回，并给出缺失项和建议。
+> 系统会根据当前场景规则检查必填项、人数范围和材料完整性，输出通过、待补充或退回，并继续生成补全追问、可复制草稿和风险建议。
 
-### 第六步：预填表单
+### 第六步：生成表单草稿
 
 点击：
 
 ```text
-预填表单
+生成表单草稿
 ```
 
 讲法：
 
-> 预填表单不是原 Word 版式回填，而是把识别出来的字段映射成系统表单草稿。后续可以扩展为 Word 模板导出。
+> 表单草稿不是原 Word 版式回填，而是把识别出来的字段映射到上传模板中的真实字段，并展示缺失项和复核提示。
 
-### 第七步：生成下一步
+### 第七步：生成办理清单
 
 点击：
 
 ```text
-生成下一步
+生成办理清单
 ```
 
 展示：
@@ -313,6 +322,7 @@ Ctrl + F5
 1. 模型接入
    - 展示 `DEMO_MODE=false`
    - 展示 DeepSeek/Qwen/OpenAI-compatible 地址。
+   - 展示 embedding 使用本地 Ollama `bge-m3`。
 
 2. Agent 编排
    - 展示 Intent/RAG/Audit/Form/Workflow/Record 节点。
@@ -340,7 +350,7 @@ Ctrl + F5
 
 1. 不要现场调试太久。
 2. 说明系统有降级能力。
-3. 展示已有导入通知的 RAG 结果和结构化审核。
+3. 展示已上传并勾选的通知/规则文件的 RAG 结果和结构化审核。
 
 ### 6.2 OCR 慢或识别差
 
@@ -398,7 +408,7 @@ Ctrl + F5
 
 答：
 
-> 文件中心支持“双用途”。同一个文件既可以入知识库用于问答，也可以作为办理材料进行抽取和审核。
+> 文件中心支持“两者都是”。同一个文件既可以作为规则/模板用于问答，也可以作为个人材料或填写草稿进行抽取和审核。
 
 ### Q5：是否支持其他高校事务？
 
@@ -413,4 +423,3 @@ Ctrl + F5
 1. 它不是聊天框，是高校事务办理闭环。
 2. 每个回答都有制度依据，每次审核都有缺失项和建议。
 3. 同一套链路可以复用到比赛报名、请假、奖助学金、报销、社团活动和其他行政场景。
-
