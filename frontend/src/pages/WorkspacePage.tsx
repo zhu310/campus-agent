@@ -1,9 +1,9 @@
 // 综合工作台页面：把上传、问答、材料审核、表单预填和流程规划串在一起。
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import type { MouseEvent } from 'react'
 import {
   Alert, Button, Card, Checkbox, Col, Descriptions, Divider, Empty, Input, List,
-  message, Radio, Row, Space, Statistic, Tabs, Tag, Timeline,
+  message, Radio, Row, Space, Tabs, Tag, Timeline,
   Typography, Upload,
 } from 'antd'
 import {
@@ -115,13 +115,26 @@ function sourceTypeLabel(value: string) {
   return value
 }
 
-function orderedFieldEntries(fields: Record<string, string>) {
+function orderedFieldEntries(fields: Record<string, unknown>) {
   const order = Object.keys(FIELD_LABELS)
   return Object.entries(fields).sort(([a], [b]) => {
     const left = order.indexOf(a)
     const right = order.indexOf(b)
     return (left === -1 ? 99 : left) - (right === -1 ? 99 : right)
   })
+}
+
+function displayValue(value: unknown): string {
+  if (value === null || value === undefined || value === '') return '-'
+  if (typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean') return String(value)
+  if (Array.isArray(value)) {
+    const simple = value.every((item) => ['string', 'number', 'boolean'].includes(typeof item))
+    return simple ? value.map(String).join('、') : JSON.stringify(value, null, 2).slice(0, 800)
+  }
+  if (typeof value === 'object') {
+    return JSON.stringify(value, null, 2).slice(0, 800)
+  }
+  return String(value)
 }
 
 function renderStructuredAnswer(text: string) {
@@ -209,14 +222,6 @@ export default function WorkspacePage({ initialScenario = '比赛报名' }: Work
     streamRef.current?.scrollTo({ top: streamRef.current.scrollHeight, behavior: 'smooth' })
   }, [copilotMessages.length])
 
-  const statItems = useMemo(
-    () => (summary?.metrics || []).map((item) => ({
-      ...item,
-      icon: item.label.includes('耗时') ? <OrderedListOutlined /> : item.label.includes('漏') ? <CheckCircleOutlined /> : <FileSearchOutlined />,
-    })),
-    [summary],
-  )
-
   const loadAll = async () => {
     // 工作台启动时并行拉取摘要、文档和演示素材，减少首屏等待。
     const [s, d, sessionRes, assets] = await Promise.all([
@@ -293,44 +298,48 @@ export default function WorkspacePage({ initialScenario = '比赛报名' }: Work
     }
     const restored: CopilotMessage[] = []
     detail.events.forEach((event) => {
-      const payload = event.payload || {}
-      if (event.event_type === 'answer') {
-        const answerPayload = {
-          answer: String(payload.answer || ''),
-          citations: Array.isArray(payload.citations) ? payload.citations : [],
-          suggestions: [],
-          trace: Array.isArray(payload.trace) ? payload.trace : [],
-          fallback_used: false,
-        } as AskResponse
-        restored.push(makeMessage('user', '我的问题', String(payload.question || event.title)))
-        restored.push(makeMessage('answer', '历史回答', answerPayload.answer, answerPayload))
-      }
-      if (event.event_type === 'tasks') {
-        const result = payload.result as NoticeTaskResponse | undefined
-        if (result) restored.push(makeMessage('tasks', '历史办理流程', result.summary, result))
-      }
-      if (event.event_type === 'fields') {
-        restored.push(makeMessage('fields', '历史信息抽取', '已恢复材料字段抽取结果。', payload))
-      }
-      if (event.event_type === 'audit') {
-        const result = payload.result as AuditResponse | undefined
-        if (result) restored.push(makeMessage('audit', '历史材料审核', result.conclusion, result))
-      }
-      if (event.event_type === 'form') {
-        const result = payload.result as FormFillResponse | undefined
-        if (result) restored.push(makeMessage('form', '历史表单预填', `仍需补充 ${result.missing_fields?.length || 0} 项字段。`, result))
-      }
-      if (event.event_type === 'workflow') {
-        const result = payload.result as WorkflowResponse | undefined
-        if (result) restored.push(makeMessage('workflow', '历史流程计划', result.summary, result))
-      }
-      if (event.event_type === 'fill_assist') {
-        const result = payload.result as FillAssistantResponse | undefined
-        if (result) restored.push(makeMessage('fillAssist', '历史填写助手', '已恢复填写建议。', result))
-      }
-      if (event.event_type === 'fill_review') {
-        const result = payload.result as FillReviewResponse | undefined
-        if (result) restored.push(makeMessage('fillReview', '历史填写审核', result.conclusion, result))
+      try {
+        const payload = event.payload || {}
+        if (event.event_type === 'answer') {
+          const answerPayload = {
+            answer: String(payload.answer || ''),
+            citations: Array.isArray(payload.citations) ? payload.citations : [],
+            suggestions: [],
+            trace: Array.isArray(payload.trace) ? payload.trace : [],
+            fallback_used: false,
+          } as AskResponse
+          restored.push(makeMessage('user', '我的问题', String(payload.question || event.title)))
+          restored.push(makeMessage('answer', '历史回答', answerPayload.answer, answerPayload))
+        }
+        if (event.event_type === 'tasks') {
+          const result = payload.result as NoticeTaskResponse | undefined
+          if (result) restored.push(makeMessage('tasks', '历史办理流程', result.summary, result))
+        }
+        if (event.event_type === 'fields') {
+          restored.push(makeMessage('fields', '历史信息抽取', '已恢复材料字段抽取结果。', payload))
+        }
+        if (event.event_type === 'audit') {
+          const result = payload.result as AuditResponse | undefined
+          if (result) restored.push(makeMessage('audit', '历史材料审核', result.conclusion, result))
+        }
+        if (event.event_type === 'form') {
+          const result = payload.result as FormFillResponse | undefined
+          if (result) restored.push(makeMessage('form', '历史表单预填', `仍需补充 ${result.missing_fields?.length || 0} 项字段。`, result))
+        }
+        if (event.event_type === 'workflow') {
+          const result = payload.result as WorkflowResponse | undefined
+          if (result) restored.push(makeMessage('workflow', '历史流程计划', result.summary, result))
+        }
+        if (event.event_type === 'fill_assist') {
+          const result = payload.result as FillAssistantResponse | undefined
+          if (result) restored.push(makeMessage('fillAssist', '历史填写助手', '已恢复填写建议。', result))
+        }
+        if (event.event_type === 'fill_review') {
+          const result = payload.result as FillReviewResponse | undefined
+          if (result) restored.push(makeMessage('fillReview', '历史填写审核', result.conclusion, result))
+        }
+      } catch {
+        restored.push(makeMessage('system', '历史记录恢复异常', `已跳过一条无法展示的历史记录：${event.title}`))
       }
     })
     setCopilotMessages(restored.length ? restored : [
@@ -546,23 +555,29 @@ export default function WorkspacePage({ initialScenario = '比赛报名' }: Work
     }
   }
 
-  const askQuestion = async () => {
+  const askQuestion = async (clearInputOnSuccess = true) => {
     if (!selectedKnowledgeIds.length) {
       message.warning('请先在左侧勾选用于问答的制度/通知文件')
+      return emptyAnswer()
+    }
+    const currentQuestion = question.trim()
+    if (!currentQuestion) {
+      message.warning('请输入问题')
       return emptyAnswer()
     }
     setLoadingAction('ask')
     try {
       const sessionId = await ensureActiveSession()
       const res = await api.post<AskResponse>('/chat/query', {
-        question,
+        question: currentQuestion,
         scenario: scenarioCode,
         document_ids: selectedKnowledgeIds,
         session_id: sessionId,
       })
       setAnswer(res.data)
-      pushMessage(makeMessage('user', '我的问题', question))
+      pushMessage(makeMessage('user', '我的问题', currentQuestion))
       pushMessage(makeMessage('answer', '基于选中文件的回答', res.data.answer, res.data))
+      if (clearInputOnSuccess) setQuestion('')
       await loadAll()
       return res.data
     } catch (error: any) {
@@ -593,6 +608,7 @@ export default function WorkspacePage({ initialScenario = '比赛报名' }: Work
       setAnswer(res.data)
       pushMessage(makeMessage('user', '我的问题', presetQuestion))
       pushMessage(makeMessage('answer', '基于选中文件的回答', res.data.answer, res.data))
+      setQuestion('')
       await loadAll()
       return res.data
     } catch (error: any) {
@@ -774,7 +790,7 @@ export default function WorkspacePage({ initialScenario = '比赛报名' }: Work
     // 完整闭环按依赖顺序执行：问答可选，字段识别、审核、预填、规划依次推进。
     setLoadingAction('full')
     try {
-      if (selectedKnowledgeIds.length) await askQuestion()
+      if (selectedKnowledgeIds.length) await askQuestion(false)
       await identifyFields()
       await auditMaterial()
       await prefillForm()
@@ -826,7 +842,7 @@ export default function WorkspacePage({ initialScenario = '比赛报名' }: Work
           <Alert type="info" showIcon message="这里展示从当前办理材料中抽取出的字段，用于后续审核和表单预填。" />
           <Descriptions size="small" column={1} bordered>
             {orderedFieldEntries(fieldResult).map(([key, value]) => (
-              <Descriptions.Item key={key} label={FIELD_LABELS[key] || key}>{value || '-'}</Descriptions.Item>
+              <Descriptions.Item key={key} label={FIELD_LABELS[key] || key}>{displayValue(value)}</Descriptions.Item>
             ))}
           </Descriptions>
         </Space>
@@ -910,7 +926,7 @@ export default function WorkspacePage({ initialScenario = '比赛报名' }: Work
       children: formResult ? (
         <Space direction="vertical" size={12} style={{ width: '100%' }}>
           <Descriptions size="small" column={1} bordered>
-            {Object.entries(formResult.fields).map(([key, value]) => <Descriptions.Item key={key} label={key}>{value || '-'}</Descriptions.Item>)}
+            {Object.entries(formResult.fields).map(([key, value]) => <Descriptions.Item key={key} label={key}>{displayValue(value)}</Descriptions.Item>)}
           </Descriptions>
           <List size="small" header="仍需补充字段" dataSource={formResult.missing_fields} locale={{ emptyText: '表单字段已较完整' }} renderItem={(item) => <List.Item>{item}</List.Item>} />
         </Space>
@@ -984,7 +1000,7 @@ export default function WorkspacePage({ initialScenario = '比赛报名' }: Work
         <Space direction="vertical" size={10} style={{ width: '100%' }}>
           <Descriptions size="small" column={1} bordered>
             {orderedFieldEntries(fields).map(([key, value]) => (
-              <Descriptions.Item key={key} label={FIELD_LABELS[key] || key}>{value || '-'}</Descriptions.Item>
+              <Descriptions.Item key={key} label={FIELD_LABELS[key] || key}>{displayValue(value)}</Descriptions.Item>
             ))}
           </Descriptions>
           <List size="small" header="仍缺字段" dataSource={data.missing_fields || []} locale={{ emptyText: '暂无缺失字段' }} renderItem={(value) => <List.Item>{value}</List.Item>} />
@@ -1007,7 +1023,7 @@ export default function WorkspacePage({ initialScenario = '比赛报名' }: Work
       return (
         <Space direction="vertical" size={10} style={{ width: '100%' }}>
           <Descriptions size="small" column={1} bordered>
-            {Object.entries(data.fields || {}).map(([key, value]) => <Descriptions.Item key={key} label={key}>{value || '-'}</Descriptions.Item>)}
+            {Object.entries(data.fields || {}).map(([key, value]) => <Descriptions.Item key={key} label={key}>{displayValue(value)}</Descriptions.Item>)}
           </Descriptions>
           <List size="small" header="仍需补充字段" dataSource={data.missing_fields || []} locale={{ emptyText: '表单字段已较完整' }} renderItem={(value) => <List.Item>{value}</List.Item>} />
         </Space>
@@ -1048,7 +1064,6 @@ export default function WorkspacePage({ initialScenario = '比赛报名' }: Work
           </Space>
           <Paragraph className="compact-desc">上传复杂通知，生成带依据的问答、办理流程、填写建议和审核结果。</Paragraph>
         </div>
-        <Space wrap>{statItems.slice(0, 3).map((item) => <Statistic key={item.label} title={item.label} value={item.value} prefix={item.icon} />)}</Space>
       </section>
 
       <Row gutter={[16, 16]} align="stretch" className="workspace-grid">
@@ -1166,7 +1181,7 @@ export default function WorkspacePage({ initialScenario = '比赛报名' }: Work
                 </div>
                 <div className="copilot-side-panel">
                   <div className="copilot-toolbox">
-                    <Button type="primary" icon={<SearchOutlined />} loading={loadingAction === 'ask'} onClick={askQuestion}>发送问题</Button>
+                    <Button type="primary" icon={<SearchOutlined />} loading={loadingAction === 'ask'} onClick={() => askQuestion()}>发送问题</Button>
                     <Button icon={<OrderedListOutlined />} loading={loadingAction === 'noticeTasks'} onClick={generateNoticeTasks}>生成办理流程</Button>
                     <Button icon={<FileSearchOutlined />} loading={loadingAction === 'ask'} onClick={() => askPresetQuestion('请总结选中文件的核心事项、截止时间和材料要求')}>总结通知</Button>
                     <Button loading={loadingAction === 'fields'} onClick={identifyFields}>提取材料信息</Button>

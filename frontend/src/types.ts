@@ -283,10 +283,17 @@ export interface DataAnalysisBlock {
 }
 
 export interface DataAnalysisResponse {
+  session_id?: number
   task: string
   files: { file_name: string; blocks: number }[]
   block_count: number
   blocks: DataAnalysisBlock[]
   insights: string
+  fallback_used: boolean
+}
+
+export interface DataAnalysisChatResponse {
+  question: string
+  answer: string
   fallback_used: boolean
 }

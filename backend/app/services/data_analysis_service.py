@@ -192,6 +192,48 @@ def _build_llm_insights(blocks: list[dict[str, Any]], task: str) -> tuple[str, b
     return _build_fallback_insights(blocks, task), True
 
 
+def answer_analysis_question(analysis: dict[str, Any], question: str, history: list[dict[str, Any]] | None = None) -> tuple[str, bool]:
+    blocks = analysis.get("blocks", []) if isinstance(analysis, dict) else []
+    compact_blocks = [
+        {
+            "key": block.get("key"),
+            "rows": block.get("row_count"),
+            "columns": block.get("column_count"),
+            "missing_rate": block.get("missing_rate"),
+            "columns_detail": block.get("columns", [])[:12],
+            "numeric_summary": block.get("numeric_summary", [])[:12],
+            "preview": block.get("preview", [])[:5],
+        }
+        for block in blocks[:8]
+    ]
+    system_prompt = "你是校园业务数据分析智能体。只能根据已上传表格摘要回答，不要编造不存在的数据。"
+    user_prompt = json.dumps(
+        {
+            "initial_task": analysis.get("task"),
+            "question": question,
+            "history": (history or [])[-8:],
+            "blocks": compact_blocks,
+        },
+        ensure_ascii=False,
+        indent=2,
+    )
+    answer = chat_completion(system_prompt, user_prompt).strip()
+    if answer:
+        return answer, False
+    if not blocks:
+        return "当前会话还没有可分析的数据，请先上传 Excel/CSV 文件。", True
+    numeric_columns = [item for block in blocks for item in block.get("numeric_summary", [])]
+    lines = [
+        f"已基于当前会话的 {len(blocks)} 个数据块回答：{question}",
+        f"总行数约 {sum(int(block.get('row_count') or 0) for block in blocks)} 行。",
+    ]
+    if numeric_columns:
+        top = max(numeric_columns, key=lambda item: abs(float(item.get("sum") or 0)))
+        lines.append(f"数值字段中较突出的字段是 {top.get('column')}，合计约 {top.get('sum')}，均值约 {round(float(top.get('mean') or 0), 2)}。")
+    lines.append("当前为本地规则回答；开启模型服务后可继续追问更细的分组、趋势和异常原因。")
+    return "\n".join(lines), True
+
+
 async def analyze_files(files: Iterable[Any], task: str) -> dict[str, Any]:
     memory_files: list[tuple[str, bytes]] = []
     for idx, file in enumerate(files):

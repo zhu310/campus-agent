@@ -1,7 +1,7 @@
 // 系统设置页：面向管理员/演示人员查看模型接入状态和切换方案。
 import { useEffect, useState } from 'react'
-import { Alert, Button, Card, Col, Descriptions, List, Radio, Row, Space, Tag, Typography, message } from 'antd'
-import { ApiOutlined, CloudServerOutlined, ReloadOutlined } from '@ant-design/icons'
+import { Alert, Button, Card, Col, Descriptions, Radio, Row, Space, Tag, Typography, message } from 'antd'
+import { CloudServerOutlined, ReloadOutlined } from '@ant-design/icons'
 import api from '../api'
 
 const { Paragraph, Text, Title } = Typography
@@ -57,7 +57,7 @@ export default function ExtensionsPage() {
 
   return (
     <Row gutter={[16, 16]}>
-      <Col xs={24} xl={15}>
+      <Col xs={24}>
         <Card title="系统设置" bordered={false} className="workspace-card records-panel">
           <Space direction="vertical" size={18} style={{ width: '100%' }}>
             <Alert
@@ -98,39 +98,6 @@ export default function ExtensionsPage() {
             </Card>
           </Space>
         </Card>
-      </Col>
-      <Col xs={24} xl={9}>
-        <Space direction="vertical" size={16} style={{ width: '100%' }}>
-          <Card title="为什么不在这里保存 Key" bordered={false} className="workspace-card">
-            <List
-              size="small"
-              dataSource={[
-                'API Key 不应明文保存在浏览器中，避免被复制、截屏或泄露。',
-                '可以在 backend/.env 同时配置 DeepSeek 和本地 Qwen 的 Key。',
-                '前端只发送 provider 名称，后端用对应 .env 配置切换运行时模型。',
-              ]}
-              renderItem={(item) => <List.Item>{item}</List.Item>}
-            />
-          </Card>
-          <Card title="建议配置流程" bordered={false} className="workspace-card">
-            <List
-              size="small"
-              dataSource={[
-                '选择 DeepSeek API 或本地 Qwen 方案。',
-                '把 Base URL、模型名和 API Key 写入 backend/.env。',
-                '重启 FastAPI 后端。',
-                '回到本页点击“测试当前连接”。',
-                '再进入智能办理页面上传通知并提问。',
-              ]}
-              renderItem={(item, index) => <List.Item><Space><Tag>{index + 1}</Tag>{item}</Space></List.Item>}
-            />
-          </Card>
-          <Card title="保留的开发者入口" bordered={false} className="workspace-card">
-            <Space direction="vertical">
-              <Button icon={<ApiOutlined />} href="http://localhost:8000/docs" target="_blank">打开 API 文档</Button>
-            </Space>
-          </Card>
-        </Space>
       </Col>
     </Row>
   )

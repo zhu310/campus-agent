@@ -31,6 +31,7 @@ def _index_document(
     filename: str,
     text: str,
     scenario: str = "competition_registration",
+    source_type: str = "knowledge_base",
     db: Session | None = None,
 ):
     """Index parsed text into SQL chunks and, when available, Qdrant."""
@@ -55,7 +56,7 @@ def _index_document(
                         "title": filename,
                         "filename": filename,
                         "scenario": scenario,
-                        "source_type": "knowledge_base",
+                        "source_type": source_type,
                         "updated_at": None,
                         "text": chunk,
                         "location": f"片段 {idx + 1}",
@@ -76,7 +77,7 @@ def _index_document(
                     chunk_id=chunk_id,
                     text=chunk,
                     scenario=scenario,
-                    source_type="knowledge_base",
+                    source_type=source_type,
                     qdrant_point_id=abs(hash(chunk_id)) % 2147483647,
                 )
             )
@@ -176,7 +177,7 @@ def upload_document(
 
     visible_name = (display_name or "").strip() or file.filename or saved_name
     source_types = {item.strip() for item in source_type.split(",") if item.strip()}
-    should_index = "knowledge_base" in source_types or source_type == "both"
+    should_index = bool(source_types) or source_type == "both"
     stored_source_type = "both" if should_index and ("material" in source_types or source_type == "both") else source_type
 
     doc = Document(
@@ -193,7 +194,7 @@ def upload_document(
 
     chunks_indexed = 0
     if should_index:
-        chunks_indexed = _index_document(doc.id, doc.filename, text, scenario=scenario, db=db)
+        chunks_indexed = _index_document(doc.id, doc.filename, text, scenario=scenario, source_type=stored_source_type, db=db)
 
     db.add(
         ToolLog(
@@ -218,5 +219,5 @@ def index_text(filename: str, text: str, scenario: str = "competition_registrati
     db.add(doc)
     db.commit()
     db.refresh(doc)
-    chunks_indexed = _index_document(doc.id, doc.filename, text, scenario=scenario, db=db)
+    chunks_indexed = _index_document(doc.id, doc.filename, text, scenario=scenario, source_type=doc.source_type, db=db)
     return UploadResponse(document_id=doc.id, filename=doc.filename, chunks_indexed=chunks_indexed, status="indexed")

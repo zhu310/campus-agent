@@ -19,7 +19,14 @@ def index_document(document_id: int, db: Session = Depends(get_db)):
     doc = db.get(Document, document_id)
     if doc is None:
         raise HTTPException(status_code=404, detail="Document not found.")
-    chunks_indexed = _index_document(doc.id, doc.filename, doc.content, scenario=doc.scenario, db=db)
+    chunks_indexed = _index_document(
+        doc.id,
+        doc.filename,
+        doc.content,
+        scenario=doc.scenario,
+        source_type=doc.source_type,
+        db=db,
+    )
     db.add(
         ToolLog(
             task_name="知识库重新索引",

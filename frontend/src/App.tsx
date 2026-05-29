@@ -1,11 +1,10 @@
 // 应用顶层导航和页面切换入口。
 import { Layout, Menu } from 'antd'
-import { AppstoreOutlined, BarChartOutlined, HistoryOutlined, ProductOutlined, SettingOutlined } from '@ant-design/icons'
+import { AppstoreOutlined, BarChartOutlined, ProductOutlined, SettingOutlined } from '@ant-design/icons'
 import { useState } from 'react'
 import DataAnalysisPage from './pages/DataAnalysisPage'
 import DashboardPage from './pages/DashboardPage'
 import ExtensionsPage from './pages/ExtensionsPage'
-import RecordsPage from './pages/RecordsPage'
 import WorkspacePage from './pages/WorkspacePage'
 
 const { Content, Header } = Layout
@@ -31,7 +30,6 @@ export default function App() {
             { key: 'dashboard', icon: <ProductOutlined />, label: 'Dashboard' },
             { key: 'workspace', icon: <AppstoreOutlined />, label: '智能办理' },
             { key: 'analytics', icon: <BarChartOutlined />, label: '数据分析' },
-            { key: 'records', icon: <HistoryOutlined />, label: '任务历史' },
             { key: 'extensions', icon: <SettingOutlined />, label: '系统设置' },
           ]}
         />
@@ -42,9 +40,6 @@ export default function App() {
         </div>
         <div style={{ display: active === 'workspace' ? 'block' : 'none', height: '100%' }}>
           <WorkspacePage initialScenario={workspaceScenario} />
-        </div>
-        <div style={{ display: active === 'records' ? 'block' : 'none', height: '100%' }}>
-          <RecordsPage />
         </div>
         <div style={{ display: active === 'analytics' ? 'block' : 'none', height: '100%' }}>
           <DataAnalysisPage />
